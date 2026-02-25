@@ -13,6 +13,10 @@
 
 namespace {
 
+// Anchor used for both mapping directions.
+// textOffset is counted as visible (non-whitespace) bytes from chapter start.
+// xpath points to the nearest element path at/near that offset.
+
 struct XPathAnchor {
   size_t textOffset = 0;
   std::string xpath;
@@ -24,6 +28,9 @@ struct StackNode {
   bool hasTextAnchor = false;
 };
 
+// ParserState is intentionally ephemeral and created per lookup call.
+// It holds only one spine parse worth of data to avoid retaining structures
+// that would increase long-lived heap usage on the ESP32-C3.
 struct ParserState {
   explicit ParserState(const int spineIndex) : spineIndex(spineIndex) { siblingCounters.emplace_back(); }
 
@@ -37,6 +44,11 @@ struct ParserState {
 
   std::string baseXPath() const { return "/body/DocFragment[" + std::to_string(spineIndex) + "]/body"; }
 
+  // Canonicalize incoming KOReader XPath before matching:
+  // - remove all whitespace
+  // - lowercase tags
+  // - strip optional trailing /text()
+  // - strip trailing slash
   static std::string normalizeXPath(const std::string& input) {
     if (input.empty()) {
       return "";
@@ -65,6 +77,8 @@ struct ParserState {
     return out;
   }
 
+  // Remove bracketed numeric predicates so paths can be compared even when
+  // index counters differ between parser implementations.
   static std::string removeIndices(const std::string& xpath) {
     std::string out;
     out.reserve(xpath.size());
@@ -96,6 +110,9 @@ struct ParserState {
     return depth;
   }
 
+  // Resolve a path to the best anchor offset.
+  // If exact node path is not found, progressively trim trailing segments and
+  // match ancestors to obtain a stable approximate location.
   bool pickBestAnchorByPath(const std::string& targetPath, const bool ignoreIndices, size_t& outTextOffset,
                             bool& outExact) const {
     if (targetPath.empty() || anchors.empty()) {
@@ -147,6 +164,7 @@ struct ParserState {
     return value;
   }
 
+  // Elements that should not contribute text position anchors.
   static bool isSkippableTag(const std::string& tag) { return tag == "head" || tag == "script" || tag == "style"; }
 
   static bool isWhitespaceOnly(const XML_Char* text, const int len) {
@@ -158,6 +176,8 @@ struct ParserState {
     return true;
   }
 
+  // Count non-whitespace bytes to keep offsets stable against formatting-only
+  // differences and indentation in source XHTML.
   static size_t countVisibleBytes(const XML_Char* text, const int len) {
     size_t count = 0;
     for (int i = 0; i < len; i++) {
@@ -192,6 +212,8 @@ struct ParserState {
     return xpath;
   }
 
+  // Adds first anchor for an element when text begins and periodic anchors in
+  // longer runs so matching has sufficient granularity without exploding memory.
   void addAnchorIfNeeded() {
     if (!insideBody() || stack.empty()) {
       return;
@@ -269,6 +291,7 @@ struct ParserState {
     return it->xpath;
   }
 
+  // Convert path -> progress ratio by matching to nearest available anchor.
   bool chooseProgressForXPath(const std::string& xpath, float& outIntraSpineProgress, bool& outExactMatch) const {
     if (anchors.empty()) {
       return false;

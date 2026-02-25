@@ -27,9 +27,16 @@ struct KOReaderPosition {
  * CrossPoint tracks position as (spineIndex, pageNumber).
  * KOReader uses XPath-like strings + percentage.
  *
- * CrossPoint first tries to extract an element-level XPath by reparsing the
- * current spine XHTML and mapping intra-spine progress to text anchors.
- * If extraction fails, it falls back to a synthetic chapter-level XPath.
+ * Forward mapping (CrossPoint -> KOReader):
+ * - Prefer element-level XPath extracted from current spine XHTML.
+ * - Fallback to synthetic chapter XPath if extraction fails.
+ *
+ * Reverse mapping (KOReader -> CrossPoint):
+ * - Prefer incoming XPath (DocFragment + element path) when resolvable.
+ * - Fallback to percentage-based approximation when XPath is missing/invalid.
+ *
+ * This keeps behavior stable on low-memory devices while improving round-trip
+ * sync precision when KOReader provides detailed paths.
  */
 class ProgressMapper {
  public:
@@ -45,8 +52,9 @@ class ProgressMapper {
   /**
    * Convert KOReader position to CrossPoint format.
    *
-   * Note: The returned pageNumber may be approximate since different
-   * rendering settings produce different page counts.
+   * Uses XPath-first resolution when possible and percentage fallback otherwise.
+   * Returned pageNumber can still be approximate because page counts differ
+   * across renderer/font/layout settings.
    *
    * @param epub The EPUB book
    * @param koPos KOReader position

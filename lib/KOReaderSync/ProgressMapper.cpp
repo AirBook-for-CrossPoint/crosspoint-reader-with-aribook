@@ -6,7 +6,6 @@
 
 #include "ChapterXPathIndexer.h"
 
-
 KOReaderPosition ProgressMapper::toKOReader(const std::shared_ptr<Epub>& epub, const CrossPointPosition& pos) {
   KOReaderPosition result;
 
