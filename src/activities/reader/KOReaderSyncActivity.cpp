@@ -222,7 +222,7 @@ void KOReaderSyncActivity::onEnter() {
           self->performSync();
           vTaskDelete(nullptr);
         },
-        "SyncTask", 4096, this, 1, nullptr);
+        "SyncTask", 8192, this, 1, nullptr);
     return;
   }
 
