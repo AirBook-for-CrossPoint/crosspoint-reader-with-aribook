@@ -642,7 +642,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
       if (!section->createSectionFile(SETTINGS.getReaderFontId(), SETTINGS.getReaderLineCompression(),
                                       SETTINGS.extraParagraphSpacing, SETTINGS.paragraphAlignment, viewportWidth,
                                       viewportHeight, SETTINGS.hyphenationEnabled, embeddedStyle, imageRendering,
-                                      popupFn)) {
+                                      progressFn)) {
         LOG_ERR("ERS", "Failed to persist page data to SD");
         section.reset();
         return;
@@ -1043,7 +1043,7 @@ bool EpubReaderActivity::drawCurrentPageToBuffer(const std::string& filePath, Gf
     if (!section->createSectionFile(SETTINGS.getReaderFontId(), SETTINGS.getReaderLineCompression(),
                                     SETTINGS.extraParagraphSpacing, SETTINGS.paragraphAlignment, viewportWidth,
                                     viewportHeight, SETTINGS.hyphenationEnabled, SETTINGS.embeddedStyle,
-                                    SETTINGS.imageRendering, []() {})) {
+                                    SETTINGS.imageRendering)) {
       LOG_ERR("SLP", "EPUB: failed to rebuild section cache for spine %d", spineIndex);
       return false;
     }
