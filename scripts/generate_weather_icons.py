@@ -244,6 +244,7 @@ def generate(svg_dir, output_path, fetch):
         "// Generated from erikflowers/weather-icons SVGs.",
         "// 48x48, 1-bit, MSB-first, row-major.",
         "// Regenerate with: python scripts/generate_weather_icons.py --fetch",
+        "// clang-format off",
         "",
     ]
     header.extend(arrays)
