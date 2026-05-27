@@ -158,6 +158,12 @@ class SettingsActivity final : public Activity {
 
   bool preserveQuickResumeTimeoutOn = false;
   bool quickResumeTimeoutAutoEnabled = false;
+  unsigned long touchDownAt = 0;
+  int touchDownCategoryIndex = -1;
+  int touchDownSettingIndex = -1;
+  int touchDownX = 0;
+  int touchDownY = 0;
+  bool topHoldBackConsumed = false;
 
   static constexpr int categoryCount = 4;
   static const StrId categoryNames[categoryCount];

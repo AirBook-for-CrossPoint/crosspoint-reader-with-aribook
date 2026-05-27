@@ -3,6 +3,7 @@
 #include <HalPowerManager.h>
 
 #include <algorithm>
+#include <cstdlib>
 
 #include "OpdsServerStore.h"
 #include "boot_sleep/BootActivity.h"
@@ -58,7 +59,9 @@ void ActivityManager::renderTaskLoop() {
 void ActivityManager::loop() {
   if (currentActivity) {
     // Note: do not hold a lock here, the loop() method must be responsible for acquire one if needed
-    currentActivity->loop();
+    if (!consumeGlobalBackNavigation()) {
+      currentActivity->loop();
+    }
   }
 
   while (pendingAction != PendingAction::None) {
@@ -144,6 +147,86 @@ void ActivityManager::loop() {
       xTaskNotify(renderTaskHandle, 1, eIncrement);
     }
   }
+}
+
+bool ActivityManager::currentActivityAllowsGlobalBack() const {
+  if (!currentActivity) {
+    return false;
+  }
+
+  return currentActivity->name != "Home" && currentActivity->name != "Boot" && currentActivity->name != "Sleep" &&
+         currentActivity->name != "Crash";
+}
+
+void ActivityManager::resetGlobalBackTouch() {
+  globalBackTouchTracking = false;
+  globalBackTouchConsumed = false;
+  globalBackTouchStartX = 0;
+  globalBackTouchStartY = 0;
+  globalBackTouchStartAt = 0;
+}
+
+void ActivityManager::navigateGlobalBack() {
+  if (stackActivities.empty()) {
+    goHome();
+  } else {
+    popActivity();
+  }
+}
+
+bool ActivityManager::consumeGlobalBackNavigation() {
+  if (!currentActivityAllowsGlobalBack()) {
+    if (!mappedInput.isTouchPressed()) {
+      resetGlobalBackTouch();
+    }
+    if (!mappedInput.isPressed(MappedInputManager::Button::Up)) {
+      globalBackTopHoldConsumed = false;
+    }
+    return false;
+  }
+
+  if (!mappedInput.isPressed(MappedInputManager::Button::Up)) {
+    globalBackTopHoldConsumed = false;
+  } else if (!globalBackTopHoldConsumed && mappedInput.getHeldTime() >= 650) {
+    globalBackTopHoldConsumed = true;
+    LOG_DBG("TOUCH", "global back via top-button hold activity=%s", currentActivity->name.c_str());
+    navigateGlobalBack();
+    return true;
+  }
+
+  const auto touchPoint = mappedInput.getTouchPoint();
+  if (mappedInput.wasTouchPressed() && touchPoint.valid) {
+    globalBackTouchTracking = true;
+    globalBackTouchConsumed = false;
+    globalBackTouchStartX = touchPoint.x;
+    globalBackTouchStartY = touchPoint.y;
+    globalBackTouchStartAt = touchPoint.timestamp;
+  }
+
+  if (globalBackTouchTracking && mappedInput.wasTouchReleased() && touchPoint.valid) {
+    const int dx = static_cast<int>(touchPoint.x) - globalBackTouchStartX;
+    const int dy = static_cast<int>(touchPoint.y) - globalBackTouchStartY;
+    const int touchWidth = renderer.getScreenWidth();
+    const int touchHeight = renderer.getScreenHeight();
+    const bool topLeftTap = globalBackTouchStartX <= touchWidth / 4 && globalBackTouchStartY <= touchHeight / 6 &&
+                            touchPoint.x <= touchWidth / 3 && touchPoint.y <= touchHeight / 5 &&
+                            abs(dx) <= touchWidth / 8 && abs(dy) <= touchWidth / 8;
+    const bool fromLeftEdge = globalBackTouchStartX <= touchWidth / 4;
+    const bool rightSwipe = dx >= touchWidth / 5 && abs(dy) <= touchWidth / 5;
+    const bool quickEnough = millis() - globalBackTouchStartAt <= 1200;
+    resetGlobalBackTouch();
+    if (!globalBackTouchConsumed && quickEnough && (topLeftTap || (fromLeftEdge && rightSwipe))) {
+      globalBackTouchConsumed = true;
+      LOG_DBG("TOUCH", "global back %s dx=%d dy=%d activity=%s", topLeftTap ? "tap" : "swipe", dx, dy,
+              currentActivity->name.c_str());
+      navigateGlobalBack();
+      return true;
+    }
+  } else if (!mappedInput.isTouchPressed()) {
+    resetGlobalBackTouch();
+  }
+
+  return false;
 }
 
 void ActivityManager::exitActivity(const RenderLock& lock) {

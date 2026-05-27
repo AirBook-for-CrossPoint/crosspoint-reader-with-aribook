@@ -3,6 +3,10 @@
 #include <GfxRenderer.h>
 #include <Logging.h>
 
+#include <algorithm>
+#include <cstdlib>
+#include <string>
+
 #include "ButtonRemapActivity.h"
 #include "ClearCacheActivity.h"
 #include "CrossPointSettings.h"
@@ -24,6 +28,25 @@
 
 const StrId SettingsActivity::categoryNames[categoryCount] = {StrId::STR_CAT_DISPLAY, StrId::STR_CAT_READER,
                                                               StrId::STR_CAT_CONTROLS, StrId::STR_CAT_SYSTEM};
+
+void SettingsActivity::enterCategory(const int categoryIndex) {
+  selectedCategoryIndex = std::max(0, std::min(categoryCount - 1, categoryIndex));
+  switch (selectedCategoryIndex) {
+    case 0:
+      currentSettings = &displaySettings;
+      break;
+    case 1:
+      currentSettings = &readerSettings;
+      break;
+    case 2:
+      currentSettings = &controlsSettings;
+      break;
+    case 3:
+      currentSettings = &systemSettings;
+      break;
+  }
+  settingsCount = static_cast<int>(currentSettings->size());
+}
 
 void SettingsActivity::rebuildSettingsLists() {
   displaySettings.clear();
@@ -69,22 +92,7 @@ void SettingsActivity::rebuildSettingsLists() {
                         SettingInfo::Action(StrId::STR_MANAGE_FONTS, SettingAction::DownloadFonts));
   readerSettings.push_back(SettingInfo::Action(StrId::STR_CUSTOMISE_STATUS_BAR, SettingAction::CustomiseStatusBar));
 
-  // Update currentSettings pointer and count for the active category
-  switch (selectedCategoryIndex) {
-    case 0:
-      currentSettings = &displaySettings;
-      break;
-    case 1:
-      currentSettings = &readerSettings;
-      break;
-    case 2:
-      currentSettings = &controlsSettings;
-      break;
-    case 3:
-      currentSettings = &systemSettings;
-      break;
-  }
-  settingsCount = static_cast<int>(currentSettings->size());
+  enterCategory(selectedCategoryIndex);
 }
 
 void SettingsActivity::onEnter() {
@@ -112,6 +120,24 @@ void SettingsActivity::onExit() {
 
 void SettingsActivity::loop() {
   bool hasChangedCategory = false;
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const auto pageWidth = renderer.getScreenWidth();
+  const auto pageHeight = renderer.getScreenHeight();
+  const Rect tabRect{0, metrics.topPadding + metrics.headerHeight, pageWidth, metrics.tabBarHeight};
+  const Rect listRect{
+      0, metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight + metrics.verticalSpacing, pageWidth,
+      pageHeight - (metrics.topPadding + metrics.headerHeight + metrics.tabBarHeight + metrics.buttonHintsHeight +
+                    metrics.verticalSpacing * 2)};
+
+  if (!mappedInput.isPressed(MappedInputManager::Button::Up)) {
+    topHoldBackConsumed = false;
+  } else if (!topHoldBackConsumed && mappedInput.getHeldTime() >= 650) {
+    topHoldBackConsumed = true;
+    LOG_DBG("SET", "top hold back");
+    SETTINGS.saveToFile();
+    onGoHome();
+    return;
+  }
 
   // Handle actions with early return
   if (mappedInput.wasPressed(MappedInputManager::Button::Confirm)) {
@@ -162,21 +188,82 @@ void SettingsActivity::loop() {
 
   if (hasChangedCategory) {
     selectedSettingIndex = (selectedSettingIndex == 0) ? 0 : 1;
-    switch (selectedCategoryIndex) {
-      case 0:
-        currentSettings = &displaySettings;
-        break;
-      case 1:
-        currentSettings = &readerSettings;
-        break;
-      case 2:
-        currentSettings = &controlsSettings;
-        break;
-      case 3:
-        currentSettings = &systemSettings;
-        break;
+    enterCategory(selectedCategoryIndex);
+  }
+
+  if (mappedInput.isTouchPressed()) {
+    const auto touchPoint = mappedInput.getTouchPoint();
+    if (touchDownAt == 0 && touchPoint.valid && millis() - touchPoint.timestamp < 1000) {
+      touchDownAt = touchPoint.timestamp;
+      touchDownX = touchPoint.x;
+      touchDownY = touchPoint.y;
+      touchDownCategoryIndex = ButtonNavigator::currentTouchHorizontalIndex(tabRect, categoryCount);
+      touchDownSettingIndex = -1;
+      if (touchPoint.x <= pageWidth / 4 && touchPoint.y <= metrics.topPadding + metrics.headerHeight) {
+        touchDownSettingIndex = -2;
+        requestUpdate(true);
+        return;
+      }
+      if (touchDownCategoryIndex >= 0) {
+        selectedSettingIndex = 0;
+        enterCategory(touchDownCategoryIndex);
+        requestUpdate(true);
+        return;
+      }
+
+      const int touchedSetting = ButtonNavigator::currentTouchListIndex(listRect, settingsCount,
+                                                                        selectedSettingIndex - 1,
+                                                                        metrics.listRowHeight);
+      if (touchedSetting >= 0) {
+        touchDownSettingIndex = touchedSetting + 1;
+        selectedSettingIndex = touchDownSettingIndex;
+        requestUpdate(true);
+      }
     }
-    settingsCount = static_cast<int>(currentSettings->size());
+    return;
+  }
+
+  if (touchDownAt != 0 && mappedInput.wasTouchReleased()) {
+    const auto touchPoint = mappedInput.getTouchPoint();
+    if (touchPoint.valid) {
+      const int touchWidth = std::max(pageWidth, pageHeight);
+      const int dx = static_cast<int>(touchPoint.x) - touchDownX;
+      const int dy = static_cast<int>(touchPoint.y) - touchDownY;
+      const bool fromLeftEdge = touchDownX <= touchWidth / 4;
+      const bool rightSwipe = dx >= touchWidth / 5 && std::abs(dy) <= touchWidth / 5;
+      if (fromLeftEdge && rightSwipe && millis() - touchDownAt <= 1200) {
+        touchDownAt = 0;
+        touchDownCategoryIndex = -1;
+        touchDownSettingIndex = -1;
+        SETTINGS.saveToFile();
+        onGoHome();
+        return;
+      }
+    }
+    if (touchDownSettingIndex == -2) {
+      LOG_DBG("SET", "touch back");
+      SETTINGS.saveToFile();
+      onGoHome();
+      touchDownAt = 0;
+      touchDownCategoryIndex = -1;
+      touchDownSettingIndex = -1;
+      return;
+    }
+    if (touchDownSettingIndex > 0) {
+      const int releaseSetting = ButtonNavigator::currentTouchListIndex(listRect, settingsCount,
+                                                                        selectedSettingIndex - 1,
+                                                                        metrics.listRowHeight);
+      if (releaseSetting < 0 || releaseSetting + 1 == touchDownSettingIndex) {
+        toggleCurrentSetting();
+        requestUpdate();
+      }
+    }
+    touchDownAt = 0;
+    touchDownCategoryIndex = -1;
+    touchDownSettingIndex = -1;
+    touchDownX = 0;
+    touchDownY = 0;
+    return;
   }
 }
 

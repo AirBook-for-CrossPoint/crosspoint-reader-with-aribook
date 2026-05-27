@@ -6,6 +6,8 @@
 
 #include <cassert>
 
+#include "HalPowerManager.h"
+
 #if !defined(SDCARDMANAGER_HAS_MANAGED_FILE)
 using SDManagedFile = FsFile;
 #endif
@@ -34,6 +36,8 @@ bool HalStorage::ready() const { return SDCard.ready(); }
 // For the rest of the methods, we acquire the mutex to ensure thread safety
 
 class HalStorage::StorageLock {
+  HalPowerManager::Lock powerLock;
+
  public:
   StorageLock() { xSemaphoreTakeRecursive(HalStorage::getInstance().storageMutex, portMAX_DELAY); }
   ~StorageLock() { xSemaphoreGiveRecursive(HalStorage::getInstance().storageMutex); }

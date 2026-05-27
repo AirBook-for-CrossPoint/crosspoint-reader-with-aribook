@@ -256,12 +256,16 @@ void EpubReaderActivity::loop() {
   }
 
   const auto touchPoint = mappedInput.getTouchPoint();
-  const bool suppressTouchConfirm =
-      touchPoint.valid && millis() - touchPoint.timestamp < 1000 && mappedInput.wasReleased(MappedInputManager::Button::Confirm);
+  const bool recentTouch = touchPoint.valid && millis() - touchPoint.timestamp < 1000;
   const bool centerTouchHold = ReaderUtils::consumeCenterTouchHold(mappedInput);
+  const bool confirmButton =
+      !recentTouch && (mappedInput.wasPressed(MappedInputManager::Button::Confirm) ||
+                       mappedInput.wasReleased(MappedInputManager::Button::Confirm));
 
   // Enter reader menu activity.
-  if (centerTouchHold || (!suppressTouchConfirm && mappedInput.wasReleased(MappedInputManager::Button::Confirm))) {
+  if (centerTouchHold || confirmButton) {
+    LOG_DBG("TOUCH", "opening epub reader menu center_hold=%d confirm=%d", centerTouchHold ? 1 : 0,
+            confirmButton ? 1 : 0);
     const int currentPage = section ? section->currentPage + 1 : 0;
     const int totalPages = section ? section->pageCount : 0;
     float bookProgress = 0.0f;
@@ -282,6 +286,7 @@ void EpubReaderActivity::loop() {
                                onReaderMenuConfirm(static_cast<EpubReaderMenuActivity::MenuAction>(menu.action));
                              }
                            });
+    return;
   }
 
   // Long press BACK (1s+) goes to file selection

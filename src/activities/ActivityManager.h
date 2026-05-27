@@ -65,6 +65,17 @@ class ActivityManager {
   // Whether to trigger a render after the current loop()
   // This variable must only be set by the main loop, to avoid race conditions
   bool requestedUpdate = false;
+  bool globalBackTopHoldConsumed = false;
+  bool globalBackTouchTracking = false;
+  bool globalBackTouchConsumed = false;
+  int globalBackTouchStartX = 0;
+  int globalBackTouchStartY = 0;
+  unsigned long globalBackTouchStartAt = 0;
+
+  bool consumeGlobalBackNavigation();
+  bool currentActivityAllowsGlobalBack() const;
+  void resetGlobalBackTouch();
+  void navigateGlobalBack();
 
  public:
   explicit ActivityManager(GfxRenderer& renderer, MappedInputManager& mappedInput)

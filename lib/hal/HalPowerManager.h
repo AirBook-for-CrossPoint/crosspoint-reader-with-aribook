@@ -25,6 +25,7 @@ class HalPowerManager {
 
   enum LockMode { None, NormalSpeed };
   LockMode currentLockMode = None;
+  uint8_t lockDepth = 0;
   SemaphoreHandle_t modeMutex = nullptr;  // Protect access to currentLockMode
 
  public:

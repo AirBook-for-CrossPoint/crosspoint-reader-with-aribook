@@ -7,6 +7,11 @@
 const MappedInputManager* ButtonNavigator::mappedInput = nullptr;
 namespace {
 unsigned long lastConsumedTouchListAt = 0;
+
+InputManager::TouchPoint touchPointForRectSpace(const MappedInputManager& input, const Rect& rect) {
+  (void)rect;
+  return input.getTouchPoint();
+}
 }
 
 void ButtonNavigator::onNext(const Callback& callback) {
@@ -130,14 +135,14 @@ int ButtonNavigator::previousPageIndex(const int currentIndex, const int totalIt
   return lastPageIndex * itemsPerPage;
 }
 
-int ButtonNavigator::touchedListIndex(const Rect& rect, const int itemCount, const int selectedIndex,
-                                      const int rowHeight) {
+int ButtonNavigator::currentTouchListIndex(const Rect& rect, const int itemCount, const int selectedIndex,
+                                           const int rowHeight, const uint32_t maxAgeMs) {
   if (!mappedInput || !mappedInput->hasTouch() || itemCount <= 0 || rowHeight <= 0) {
     return -1;
   }
 
-  const auto touchPoint = mappedInput->getTouchPoint();
-  if (!touchPoint.valid || touchPoint.timestamp == lastConsumedTouchListAt || millis() - touchPoint.timestamp > 1000) {
+  const auto touchPoint = touchPointForRectSpace(*mappedInput, rect);
+  if (!touchPoint.valid || millis() - touchPoint.timestamp > maxAgeMs) {
     return -1;
   }
 
@@ -159,17 +164,36 @@ int ButtonNavigator::touchedListIndex(const Rect& rect, const int itemCount, con
     return -1;
   }
 
+  return index;
+}
+
+int ButtonNavigator::touchedListIndex(const Rect& rect, const int itemCount, const int selectedIndex,
+                                      const int rowHeight) {
+  if (!mappedInput || !mappedInput->hasTouch()) {
+    return -1;
+  }
+
+  const auto touchPoint = touchPointForRectSpace(*mappedInput, rect);
+  if (!touchPoint.valid || touchPoint.timestamp == lastConsumedTouchListAt) {
+    return -1;
+  }
+
+  const int index = currentTouchListIndex(rect, itemCount, selectedIndex, rowHeight);
+  if (index < 0) {
+    return -1;
+  }
+
   lastConsumedTouchListAt = touchPoint.timestamp;
   return index;
 }
 
-int ButtonNavigator::touchedHorizontalIndex(const Rect& rect, const int itemCount) {
+int ButtonNavigator::currentTouchHorizontalIndex(const Rect& rect, const int itemCount, const uint32_t maxAgeMs) {
   if (!mappedInput || !mappedInput->hasTouch() || itemCount <= 0 || rect.width <= 0 || rect.height <= 0) {
     return -1;
   }
 
-  const auto touchPoint = mappedInput->getTouchPoint();
-  if (!touchPoint.valid || touchPoint.timestamp == lastConsumedTouchListAt || millis() - touchPoint.timestamp > 1000) {
+  const auto touchPoint = touchPointForRectSpace(*mappedInput, rect);
+  if (!touchPoint.valid || millis() - touchPoint.timestamp > maxAgeMs) {
     return -1;
   }
 
@@ -181,6 +205,24 @@ int ButtonNavigator::touchedHorizontalIndex(const Rect& rect, const int itemCoun
 
   const int index = ((x - rect.x) * itemCount) / rect.width;
   if (index < 0 || index >= itemCount) {
+    return -1;
+  }
+
+  return index;
+}
+
+int ButtonNavigator::touchedHorizontalIndex(const Rect& rect, const int itemCount) {
+  if (!mappedInput || !mappedInput->hasTouch()) {
+    return -1;
+  }
+
+  const auto touchPoint = touchPointForRectSpace(*mappedInput, rect);
+  if (!touchPoint.valid || touchPoint.timestamp == lastConsumedTouchListAt) {
+    return -1;
+  }
+
+  const int index = currentTouchHorizontalIndex(rect, itemCount);
+  if (index < 0) {
     return -1;
   }
 

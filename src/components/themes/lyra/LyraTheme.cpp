@@ -122,21 +122,24 @@ void LyraTheme::fillBatteryIcon(const GfxRenderer& renderer, Rect rect, uint16_t
 
 void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle) const {
   const auto& metrics = UITheme::getInstance().getMetrics();
+  const bool touchPrimary = DeviceProfiles::current().touchPrimary;
+  const int sidePadding = touchPrimary ? 10 : metrics.contentSidePadding;
   renderer.fillRect(rect.x, rect.y, rect.width, rect.height, false);
 
   const bool showBatteryPercentage =
       SETTINGS.hideBatteryPercentage != CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS;
   // Position icon at right edge, drawBatteryRight will place text to the left
-  const int batteryX = rect.x + rect.width - metrics.contentSidePadding - metrics.batteryWidth;
+  const int batteryX = rect.x + rect.width - sidePadding - metrics.batteryWidth;
   drawBatteryRight(renderer, Rect{batteryX, rect.y + 5, metrics.batteryWidth, metrics.batteryHeight},
                    showBatteryPercentage);
 
-  int maxTitleWidth = title != nullptr ? renderer.getTextWidth(UI_12_FONT_ID, title, EpdFontFamily::BOLD) : 0;
+  const int titleFontId = touchPrimary ? SMALL_FONT_ID : UI_12_FONT_ID;
+  int maxTitleWidth = title != nullptr ? renderer.getTextWidth(titleFontId, title, EpdFontFamily::BOLD) : 0;
   int maxSubtitleWidth =
       subtitle != nullptr ? renderer.getTextWidth(SMALL_FONT_ID, subtitle, EpdFontFamily::REGULAR) : 0;
 
   // Available space is the distance between the side paddings, and a with side padding between title and subtitle.
-  const int availableSpace = rect.width - metrics.contentSidePadding * 3;
+  const int availableSpace = rect.width - sidePadding * 3;
 
   if (maxTitleWidth + maxSubtitleWidth > availableSpace) {
     if ((maxTitleWidth > availableSpace / 2) && (maxSubtitleWidth > availableSpace / 2)) {
@@ -154,9 +157,9 @@ void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* t
   }
 
   if (title) {
-    auto truncatedTitle = renderer.truncatedText(UI_12_FONT_ID, title, maxTitleWidth, EpdFontFamily::BOLD);
-    renderer.drawText(UI_12_FONT_ID, rect.x + metrics.contentSidePadding, rect.y + metrics.batteryBarHeight + 3,
-                      truncatedTitle.c_str(), true,
+    auto truncatedTitle = renderer.truncatedText(titleFontId, title, maxTitleWidth, EpdFontFamily::BOLD);
+    const int titleY = touchPrimary ? rect.y + 5 : rect.y + metrics.batteryBarHeight + 3;
+    renderer.drawText(titleFontId, rect.x + sidePadding, titleY, truncatedTitle.c_str(), true,
                       EpdFontFamily::BOLD);
     renderer.drawLine(rect.x, rect.y + rect.height - 3, rect.x + rect.width - 1, rect.y + rect.height - 3, 3, true);
   }
@@ -164,27 +167,31 @@ void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* t
   if (subtitle) {
     auto truncatedSubtitle = renderer.truncatedText(SMALL_FONT_ID, subtitle, maxSubtitleWidth, EpdFontFamily::REGULAR);
     int truncatedSubtitleWidth = renderer.getTextWidth(SMALL_FONT_ID, truncatedSubtitle.c_str());
-    renderer.drawText(SMALL_FONT_ID, rect.x + rect.width - metrics.contentSidePadding - truncatedSubtitleWidth,
-                      rect.y + metrics.batteryBarHeight + 5, truncatedSubtitle.c_str(), true);
+    const int subtitleY = touchPrimary ? rect.y + 7 : rect.y + metrics.batteryBarHeight + 5;
+    renderer.drawText(SMALL_FONT_ID, rect.x + rect.width - sidePadding - truncatedSubtitleWidth,
+                      subtitleY, truncatedSubtitle.c_str(), true);
   }
 }
 
 void LyraTheme::drawSubHeader(const GfxRenderer& renderer, Rect rect, const char* label, const char* rightLabel) const {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  int currentX = rect.x + metrics.contentSidePadding;
-  int rightSpace = metrics.contentSidePadding;
+  const bool touchPrimary = DeviceProfiles::current().touchPrimary;
+  const int labelFontId = touchPrimary ? SMALL_FONT_ID : UI_10_FONT_ID;
+  const int sidePadding = touchPrimary ? 10 : metrics.contentSidePadding;
+  int currentX = rect.x + sidePadding;
+  int rightSpace = sidePadding;
   if (rightLabel) {
     auto truncatedRightLabel =
         renderer.truncatedText(SMALL_FONT_ID, rightLabel, maxListValueWidth, EpdFontFamily::REGULAR);
     int rightLabelWidth = renderer.getTextWidth(SMALL_FONT_ID, truncatedRightLabel.c_str());
-    renderer.drawText(SMALL_FONT_ID, rect.x + rect.width - metrics.contentSidePadding - rightLabelWidth,
+    renderer.drawText(SMALL_FONT_ID, rect.x + rect.width - sidePadding - rightLabelWidth,
                       rect.y + 7, truncatedRightLabel.c_str());
     rightSpace += rightLabelWidth + hPaddingInSelection;
   }
 
   auto truncatedLabel = renderer.truncatedText(
-      UI_10_FONT_ID, label, rect.width - metrics.contentSidePadding - rightSpace, EpdFontFamily::REGULAR);
-  renderer.drawText(UI_10_FONT_ID, currentX, rect.y + 6, truncatedLabel.c_str(), true, EpdFontFamily::REGULAR);
+      labelFontId, label, rect.width - sidePadding - rightSpace, EpdFontFamily::REGULAR);
+  renderer.drawText(labelFontId, currentX, rect.y + 6, truncatedLabel.c_str(), true, EpdFontFamily::REGULAR);
 
   renderer.drawLine(rect.x, rect.y + rect.height - 1, rect.x + rect.width - 1, rect.y + rect.height - 1, true);
 }
@@ -192,31 +199,61 @@ void LyraTheme::drawSubHeader(const GfxRenderer& renderer, Rect rect, const char
 void LyraTheme::drawTabBar(const GfxRenderer& renderer, Rect rect, const std::vector<TabInfo>& tabs,
                            bool selected) const {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  int currentX = rect.x + metrics.contentSidePadding;
+  const bool touchPrimary = DeviceProfiles::current().touchPrimary;
+  const int tabFontId = touchPrimary ? SMALL_FONT_ID : UI_10_FONT_ID;
+  const int sidePadding = touchPrimary ? 4 : metrics.contentSidePadding;
+  const int selectionPadding = touchPrimary ? 3 : hPaddingInSelection;
+  int currentX = rect.x + sidePadding;
 
   if (selected) {
     renderer.fillRectDither(rect.x, rect.y, rect.width, rect.height, Color::LightGray);
   }
 
+  if (touchPrimary && !tabs.empty()) {
+    const int tabWidth = std::max(1, (rect.width - sidePadding * 2) / static_cast<int>(tabs.size()));
+    for (int i = 0; i < static_cast<int>(tabs.size()); ++i) {
+      const auto& tab = tabs[i];
+      const int tabX = rect.x + sidePadding + i * tabWidth;
+      const int availableTextWidth = std::max(1, tabWidth - selectionPadding * 2);
+      auto label = renderer.truncatedText(tabFontId, tab.label, availableTextWidth, EpdFontFamily::REGULAR);
+      const int textWidth = renderer.getTextWidth(tabFontId, label.c_str(), EpdFontFamily::REGULAR);
+      const int textX = tabX + (tabWidth - textWidth) / 2;
+
+      if (tab.selected) {
+        if (selected) {
+          renderer.fillRoundedRect(tabX, rect.y + 1, tabWidth, rect.height - 4, cornerRadius, Color::Black);
+        } else {
+          renderer.fillRectDither(tabX, rect.y, tabWidth, rect.height - 3, Color::LightGray);
+          renderer.drawLine(tabX, rect.y + rect.height - 3, tabX + tabWidth - 1, rect.y + rect.height - 3, 2, true);
+        }
+      }
+
+      renderer.drawText(tabFontId, textX, rect.y + 5, label.c_str(), !(tab.selected && selected),
+                        EpdFontFamily::REGULAR);
+    }
+    renderer.drawLine(rect.x, rect.y + rect.height - 1, rect.x + rect.width - 1, rect.y + rect.height - 1, true);
+    return;
+  }
+
   for (const auto& tab : tabs) {
-    const int textWidth = renderer.getTextWidth(UI_10_FONT_ID, tab.label, EpdFontFamily::REGULAR);
+    const int textWidth = renderer.getTextWidth(tabFontId, tab.label, EpdFontFamily::REGULAR);
 
     if (tab.selected) {
       if (selected) {
-        renderer.fillRoundedRect(currentX, rect.y + 1, textWidth + 2 * hPaddingInSelection, rect.height - 4,
+        renderer.fillRoundedRect(currentX, rect.y + 1, textWidth + 2 * selectionPadding, rect.height - 4,
                                  cornerRadius, Color::Black);
       } else {
-        renderer.fillRectDither(currentX, rect.y, textWidth + 2 * hPaddingInSelection, rect.height - 3,
+        renderer.fillRectDither(currentX, rect.y, textWidth + 2 * selectionPadding, rect.height - 3,
                                 Color::LightGray);
-        renderer.drawLine(currentX, rect.y + rect.height - 3, currentX + textWidth + 2 * hPaddingInSelection,
+        renderer.drawLine(currentX, rect.y + rect.height - 3, currentX + textWidth + 2 * selectionPadding,
                           rect.y + rect.height - 3, 2, true);
       }
     }
 
-    renderer.drawText(UI_10_FONT_ID, currentX + hPaddingInSelection, rect.y + 6, tab.label, !(tab.selected && selected),
+    renderer.drawText(tabFontId, currentX + selectionPadding, rect.y + 6, tab.label, !(tab.selected && selected),
                       EpdFontFamily::REGULAR);
 
-    currentX += textWidth + metrics.tabSpacing + 2 * hPaddingInSelection;
+    currentX += textWidth + metrics.tabSpacing + 2 * selectionPadding;
   }
 
   renderer.drawLine(rect.x, rect.y + rect.height - 1, rect.x + rect.width - 1, rect.y + rect.height - 1, true);
@@ -229,6 +266,14 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
                          const std::function<std::string(int index)>& rowValue, bool highlightValue,
                          const std::function<bool(int index)>& rowDimmed) const {
   const auto& metrics = UITheme::getInstance().getMetrics();
+  const bool touchPrimary = DeviceProfiles::current().touchPrimary;
+  const int listFontId = touchPrimary ? SMALL_FONT_ID : UI_10_FONT_ID;
+  const int sidePadding = touchPrimary ? 10 : metrics.contentSidePadding;
+  const int selectionPadding = touchPrimary ? 4 : hPaddingInSelection;
+  const int titleYOffset = touchPrimary ? 4 : 7;
+  const int subtitleYOffset = touchPrimary ? 22 : 30;
+  const int valueYOffset = touchPrimary ? 4 : 6;
+  const int subtitleValueYOffset = touchPrimary ? 11 : 16;
   int rowHeight = (rowSubtitle != nullptr) ? metrics.listWithSubtitleRowHeight : metrics.listRowHeight;
   int pageItems = rect.height / rowHeight;
 
@@ -252,17 +297,17 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
       (totalPages > 1 ? (metrics.scrollBarWidth + metrics.scrollBarRightOffset) : 1);
   if (selectedIndex >= 0) {
     renderer.fillRoundedRect(
-        rect.x + metrics.contentSidePadding, rect.y + selectedIndex % pageItems * rowHeight,
-        contentWidth - metrics.contentSidePadding * 2, rowHeight, cornerRadius, Color::LightGray);
+        rect.x + sidePadding, rect.y + selectedIndex % pageItems * rowHeight,
+        contentWidth - sidePadding * 2, rowHeight, cornerRadius, Color::LightGray);
   }
 
-  int textX = rect.x + metrics.contentSidePadding + hPaddingInSelection;
-  int textWidth = contentWidth - metrics.contentSidePadding * 2 - hPaddingInSelection * 2;
+  int textX = rect.x + sidePadding + selectionPadding;
+  int textWidth = contentWidth - sidePadding * 2 - selectionPadding * 2;
   int iconSize;
   if (rowIcon != nullptr) {
     iconSize = (rowSubtitle != nullptr) ? mainMenuIconSize : listIconSize;
-    textX += iconSize + hPaddingInSelection;
-    textWidth -= iconSize + hPaddingInSelection;
+    textX += iconSize + selectionPadding;
+    textWidth -= iconSize + selectionPadding;
   }
 
   // Draw all items
@@ -277,20 +322,20 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
     std::string valueText = "";
     if (rowValue != nullptr) {
       valueText = rowValue(i);
-      valueText = renderer.truncatedText(UI_10_FONT_ID, valueText.c_str(), maxListValueWidth);
-      valueWidth = renderer.getTextWidth(UI_10_FONT_ID, valueText.c_str()) + hPaddingInSelection;
+      valueText = renderer.truncatedText(listFontId, valueText.c_str(), maxListValueWidth);
+      valueWidth = renderer.getTextWidth(listFontId, valueText.c_str()) + selectionPadding;
       rowTextWidth -= valueWidth;
     }
 
     auto itemName = rowTitle(i);
-    auto item = renderer.truncatedText(UI_10_FONT_ID, itemName.c_str(), rowTextWidth);
-    renderer.drawText(UI_10_FONT_ID, textX, itemY + 7, item.c_str(), true);
+    auto item = renderer.truncatedText(listFontId, itemName.c_str(), rowTextWidth);
+    renderer.drawText(listFontId, textX, itemY + titleYOffset, item.c_str(), true);
 
     // Apply checkerboard dither to create gray text effect for dimmed items
     if (rowDimmed && rowDimmed(i) && i != selectedIndex) {
-      const int titleWidth = renderer.getTextWidth(UI_10_FONT_ID, item.c_str());
-      const int lineH = renderer.getLineHeight(UI_10_FONT_ID);
-      for (int py = itemY + 7; py < itemY + 7 + lineH; py++)
+      const int titleWidth = renderer.getTextWidth(listFontId, item.c_str());
+      const int lineH = renderer.getLineHeight(listFontId);
+      for (int py = itemY + titleYOffset; py < itemY + titleYOffset + lineH; py++)
         for (int px = textX; px < textX + titleWidth; px++)
           if ((px + py) % 2 == 0) renderer.drawPixel(px, py, false);
     }
@@ -299,7 +344,7 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
       UIIcon icon = rowIcon(i);
       const uint8_t* iconBitmap = iconForName(icon, iconSize);
       if (iconBitmap != nullptr) {
-        renderer.drawIcon(iconBitmap, rect.x + metrics.contentSidePadding + hPaddingInSelection,
+        renderer.drawIcon(iconBitmap, rect.x + sidePadding + selectionPadding,
                           itemY + iconY, iconSize, iconSize);
       }
     }
@@ -308,22 +353,22 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
       // Draw subtitle
       std::string subtitleText = rowSubtitle(i);
       auto subtitle = renderer.truncatedText(SMALL_FONT_ID, subtitleText.c_str(), rowTextWidth);
-      renderer.drawText(SMALL_FONT_ID, textX, itemY + 30, subtitle.c_str(), true);
+      renderer.drawText(SMALL_FONT_ID, textX, itemY + subtitleYOffset, subtitle.c_str(), true);
     }
 
     // Draw value
     if (!valueText.empty()) {
       if (i == selectedIndex && highlightValue) {
         renderer.fillRoundedRect(
-            rect.x + contentWidth - metrics.contentSidePadding - hPaddingInSelection - valueWidth, itemY,
-            valueWidth + hPaddingInSelection, rowHeight, cornerRadius, Color::Black);
+            rect.x + contentWidth - sidePadding - selectionPadding - valueWidth, itemY,
+            valueWidth + selectionPadding, rowHeight, cornerRadius, Color::Black);
       }
 
-      int valueY = itemY + 6;
+      int valueY = itemY + valueYOffset;
       if (rowSubtitle != nullptr) {
-        valueY = itemY + 16;
+        valueY = itemY + subtitleValueYOffset;
       }
-      renderer.drawText(UI_10_FONT_ID, rect.x + contentWidth - metrics.contentSidePadding - valueWidth,
+      renderer.drawText(listFontId, rect.x + contentWidth - sidePadding - valueWidth,
                         valueY, valueText.c_str(), !(i == selectedIndex && highlightValue));
     }
   }

@@ -1,13 +1,12 @@
 #pragma once
-#include <functional>
 #include <vector>
 
 #include "./FileBrowserActivity.h"
 #include "activities/Activity.h"
+#include "components/UITheme.h"
 #include "util/ButtonNavigator.h"
 
 struct RecentBook;
-struct Rect;
 
 class HomeActivity final : public Activity {
   ButtonNavigator buttonNavigator;
@@ -27,8 +26,14 @@ class HomeActivity final : public Activity {
   int coverRectY = 0;
   int coverRectW = 0;
   int coverRectH = 0;
+  std::vector<Rect> homeHitRects;
+  std::vector<int> homeHitSelectors;
   std::vector<RecentBook> recentBooks;
   const HomeMenuItem initialMenuItem;
+  unsigned long lastHandledTouchAt = 0;
+  unsigned long homeTouchDownAt = 0;
+  int homeTouchDownSelector = -1;
+  bool ignoreTouchUntilRelease = false;
 
   // Convert HomeMenuItem to menu index (used in onEnter)
   static int menuItemToIndex(HomeMenuItem item, bool hasOpdsUrl) {
@@ -61,6 +66,14 @@ class HomeActivity final : public Activity {
   void onSettingsOpen();
   void onFileTransferOpen();
   void onOpdsBrowserOpen();
+  void activateSelectedItem();
+  Rect homeMenuRect() const;
+  int visibleHomeMenuItemCount() const;
+  int homeMenuRowToSelectorIndex(int rowIndex) const;
+  InputManager::TouchPoint homeTouchPoint() const;
+  int touchedHomeSelectorIndex(const InputManager::TouchPoint& touchPoint) const;
+  bool isFreshHomeTouch(unsigned long timestamp) const;
+  void resetHomeTouchTracking();
 
   int getMenuItemCount() const;
   bool storeCoverBuffer();    // Store frame buffer for cover image

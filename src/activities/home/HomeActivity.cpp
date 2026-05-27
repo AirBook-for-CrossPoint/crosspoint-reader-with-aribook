@@ -9,12 +9,15 @@
 #include <Utf8.h>
 #include <Xtc.h>
 
+#include <algorithm>
 #include <cstring>
+#include <functional>
 #include <vector>
 
 #include "CrossPointSettings.h"
 #include "CrossPointState.h"
 #include "DeviceProfile.h"
+#include "Logging.h"
 #include "MappedInputManager.h"
 #include "OpdsServerStore.h"
 #include "RecentBooksStore.h"
@@ -114,6 +117,12 @@ void HomeActivity::onEnter() {
   Activity::onEnter();
 
   hasOpdsServers = OPDS_STORE.hasServers();
+  const auto touchPoint = mappedInput.getTouchPoint();
+  if (touchPoint.valid) {
+    lastHandledTouchAt = touchPoint.timestamp;
+    ignoreTouchUntilRelease = true;
+  }
+  resetHomeTouchTracking();
 
   const auto& metrics = UITheme::getInstance().getMetrics();
   loadRecentBooks(metrics.homeRecentBooksCount);
@@ -181,38 +190,59 @@ void HomeActivity::loop() {
     requestUpdate();
   });
 
-  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
-    if (selectorIndex < recentBooks.size()) {
-      onSelectBook(recentBooks[selectorIndex].path);
-    } else {
-      const int menuIndex = selectorIndex - static_cast<int>(recentBooks.size());
-      switch (indexToMenuItem(menuIndex, hasOpdsServers)) {
-        case HomeMenuItem::FILE_BROWSER:
-          onFileBrowserOpen();
-          break;
-        case HomeMenuItem::RECENTS:
-          onRecentsOpen();
-          break;
-        case HomeMenuItem::OPDS_BROWSER:
-          onOpdsBrowserOpen();
-          break;
-        case HomeMenuItem::FILE_TRANSFER:
-          onFileTransferOpen();
-          break;
-        case HomeMenuItem::SETTINGS_MENU:
-          onSettingsOpen();
-          break;
-        default:
-          break;
+  if (ignoreTouchUntilRelease) {
+    if (mappedInput.isTouchPressed()) {
+      return;
+    }
+    ignoreTouchUntilRelease = false;
+    resetHomeTouchTracking();
+    return;
+  }
+
+  const auto touchPoint = homeTouchPoint();
+  if (mappedInput.isTouchPressed() && touchPoint.valid && isFreshHomeTouch(touchPoint.timestamp)) {
+    if (homeTouchDownAt == 0) {
+      homeTouchDownAt = touchPoint.timestamp;
+      homeTouchDownSelector = touchedHomeSelectorIndex(touchPoint);
+      LOG_DBG("HOME", "touch down selector=%d x=%d y=%d hits=%u", homeTouchDownSelector, touchPoint.x, touchPoint.y,
+              static_cast<unsigned>(homeHitRects.size()));
+      if (homeTouchDownSelector >= 0 && selectorIndex != homeTouchDownSelector) {
+        selectorIndex = homeTouchDownSelector;
+        requestUpdate(true);
       }
     }
+    return;
+  }
+
+  if (homeTouchDownAt != 0 && mappedInput.wasTouchReleased()) {
+    const unsigned long heldMs = millis() - homeTouchDownAt;
+    const int releaseSelector = touchPoint.valid ? touchedHomeSelectorIndex(touchPoint) : homeTouchDownSelector;
+    if (heldMs < 700 && homeTouchDownSelector >= 0 && releaseSelector == homeTouchDownSelector &&
+        homeTouchDownAt != lastHandledTouchAt) {
+      selectorIndex = homeTouchDownSelector;
+      LOG_DBG("HOME", "touch tap selector=%d held=%lu", selectorIndex, heldMs);
+      lastHandledTouchAt = homeTouchDownAt;
+      resetHomeTouchTracking();
+      activateSelectedItem();
+      return;
+    }
+    LOG_DBG("HOME", "touch ignored selector=%d release=%d held=%lu", homeTouchDownSelector, releaseSelector, heldMs);
+    lastHandledTouchAt = homeTouchDownAt;
+    resetHomeTouchTracking();
+    return;
+  }
+
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+    activateSelectedItem();
   }
 }
 
 void HomeActivity::render(RenderLock&&) {
   const auto& metrics = UITheme::getInstance().getMetrics();
   const auto pageWidth = renderer.getScreenWidth();
-  const auto pageHeight = renderer.getScreenHeight();
+
+  homeHitRects.clear();
+  homeHitSelectors.clear();
 
   renderer.clearScreen();
   bool bufferRestored = coverBufferStored && restoreCoverBuffer();
@@ -227,6 +257,11 @@ void HomeActivity::render(RenderLock&&) {
   coverRectY = metrics.homeTopPadding;
   coverRectW = pageWidth;
   coverRectH = metrics.homeCoverTileHeight;
+
+  if (!metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
+    homeHitRects.push_back(Rect{coverRectX, coverRectY, coverRectW, coverRectH});
+    homeHitSelectors.push_back(0);
+  }
 
   GUI.drawRecentBookCover(renderer, Rect{0, metrics.homeTopPadding, pageWidth, metrics.homeCoverTileHeight},
                           recentBooks, selectorIndex, coverRendered, coverBufferStored, bufferRestored,
@@ -248,15 +283,18 @@ void HomeActivity::render(RenderLock&&) {
     menuIcons.insert(menuIcons.begin(), Book);
   }
 
+  const Rect menuRect = homeMenuRect();
+  const int menuTileWidth = menuRect.width - metrics.contentSidePadding * 2;
+  for (int row = 0; row < visibleHomeMenuItemCount(); ++row) {
+    homeHitRects.push_back(Rect{menuRect.x + metrics.contentSidePadding,
+                                menuRect.y + row * (metrics.menuRowHeight + metrics.menuSpacing),
+                                menuTileWidth,
+                                metrics.menuRowHeight});
+    homeHitSelectors.push_back(homeMenuRowToSelectorIndex(row));
+  }
+
   GUI.drawButtonMenu(
-      renderer,
-      Rect{0, metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.homeMenuTopOffset, pageWidth,
-           pageHeight - (metrics.headerHeight + metrics.homeTopPadding + metrics.verticalSpacing +
-                         metrics.homeMenuTopOffset
-#if !defined(CROSSPOINT_BOARD_MURPHY_M3) && !defined(BOARD_MURPHY_M3)
-                         + metrics.buttonHintsHeight
-#endif
-                         )},
+      renderer, menuRect,
       static_cast<int>(menuItems.size()),
       metrics.homeContinueReadingInMenu ? selectorIndex : selectorIndex - recentBooks.size(),
       [&menuItems](int index) { return std::string(menuItems[index]); },
@@ -289,3 +327,99 @@ void HomeActivity::onSettingsOpen() { activityManager.goToSettings(); }
 void HomeActivity::onFileTransferOpen() { activityManager.goToFileTransfer(); }
 
 void HomeActivity::onOpdsBrowserOpen() { activityManager.goToBrowser(); }
+
+void HomeActivity::activateSelectedItem() {
+  if (selectorIndex < recentBooks.size()) {
+    onSelectBook(recentBooks[selectorIndex].path);
+    return;
+  }
+
+  const int menuIndex = selectorIndex - static_cast<int>(recentBooks.size());
+  switch (indexToMenuItem(menuIndex, hasOpdsServers)) {
+    case HomeMenuItem::FILE_BROWSER:
+      onFileBrowserOpen();
+      break;
+    case HomeMenuItem::RECENTS:
+      onRecentsOpen();
+      break;
+    case HomeMenuItem::OPDS_BROWSER:
+      onOpdsBrowserOpen();
+      break;
+    case HomeMenuItem::FILE_TRANSFER:
+      onFileTransferOpen();
+      break;
+    case HomeMenuItem::SETTINGS_MENU:
+      onSettingsOpen();
+      break;
+    default:
+      break;
+  }
+}
+
+Rect HomeActivity::homeMenuRect() const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  const auto pageWidth = renderer.getScreenWidth();
+  const auto pageHeight = renderer.getScreenHeight();
+  return Rect{0, metrics.homeTopPadding + metrics.homeCoverTileHeight + metrics.homeMenuTopOffset, pageWidth,
+              pageHeight - (metrics.headerHeight + metrics.homeTopPadding + metrics.verticalSpacing +
+                            metrics.homeMenuTopOffset
+#if !defined(CROSSPOINT_BOARD_MURPHY_M3) && !defined(BOARD_MURPHY_M3)
+                            + metrics.buttonHintsHeight
+#endif
+                            )};
+}
+
+int HomeActivity::visibleHomeMenuItemCount() const {
+  int count = 4;  // File Browser, Recents, File transfer, Settings
+  if (hasOpdsServers) {
+    count++;
+  }
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
+    count++;
+  }
+  return count;
+}
+
+int HomeActivity::homeMenuRowToSelectorIndex(const int rowIndex) const {
+  const auto& metrics = UITheme::getInstance().getMetrics();
+  if (metrics.homeContinueReadingInMenu && !recentBooks.empty()) {
+    if (rowIndex == 0) {
+      return 0;
+    }
+    return static_cast<int>(recentBooks.size()) + rowIndex - 1;
+  }
+  return static_cast<int>(recentBooks.size()) + rowIndex;
+}
+
+InputManager::TouchPoint HomeActivity::homeTouchPoint() const {
+  return mappedInput.getTouchPoint();
+}
+
+int HomeActivity::touchedHomeSelectorIndex(const InputManager::TouchPoint& touchPoint) const {
+  if (!touchPoint.valid || !isFreshHomeTouch(touchPoint.timestamp)) {
+    return -1;
+  }
+
+  constexpr int hitSlop = 2;
+  for (size_t i = 0; i < homeHitRects.size() && i < homeHitSelectors.size(); ++i) {
+    const Rect& rect = homeHitRects[i];
+    if (touchPoint.x >= rect.x - hitSlop && touchPoint.x < rect.x + rect.width + hitSlop &&
+        touchPoint.y >= rect.y - hitSlop && touchPoint.y < rect.y + rect.height + hitSlop) {
+      return homeHitSelectors[i];
+    }
+  }
+
+  LOG_DBG("HOME", "touch miss x=%d y=%d hits=%u", touchPoint.x, touchPoint.y,
+          static_cast<unsigned>(homeHitRects.size()));
+  return -1;
+}
+
+bool HomeActivity::isFreshHomeTouch(const unsigned long timestamp) const {
+  return timestamp != lastHandledTouchAt && millis() - timestamp < 1000;
+}
+
+void HomeActivity::resetHomeTouchTracking() {
+  homeTouchDownAt = 0;
+  homeTouchDownSelector = -1;
+}

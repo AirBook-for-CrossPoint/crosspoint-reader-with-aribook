@@ -1,27 +1,58 @@
 #include "MappedInputManager.h"
 
+#include <BoardConfig.h>
+
+#include <algorithm>
+
 #include "CrossPointSettings.h"
 #include "Logging.h"
 
 namespace {
 unsigned long lastConsumedTouchPageTurnAt = 0;
 
+int touchWidth() {
+  return std::min(static_cast<int>(BoardConfig::ACTIVE.displayWidth),
+                  static_cast<int>(BoardConfig::ACTIVE.displayHeight));
+}
+
+int touchHeight() {
+  return std::max(static_cast<int>(BoardConfig::ACTIVE.displayWidth),
+                  static_cast<int>(BoardConfig::ACTIVE.displayHeight));
+}
+
+InputManager::TouchPoint appTouchPoint(InputManager::TouchPoint touchPoint) {
+  if (!touchPoint.valid) {
+    return touchPoint;
+  }
+
+  const int physicalWidth = touchHeight();
+  const int physicalHeight = touchWidth();
+  const int appWidth = touchWidth();
+  const int appHeight = touchHeight();
+
+  touchPoint.x = std::max(
+      0, std::min(appWidth - 1,
+                  static_cast<int>(static_cast<int64_t>(touchPoint.x) * appWidth / physicalWidth)));
+  touchPoint.y = std::max(
+      0, std::min(appHeight - 1,
+                  static_cast<int>(static_cast<int64_t>(touchPoint.y) * appHeight / physicalHeight)));
+  return touchPoint;
+}
+
 bool touchPageTurnFor(const HalGPIO& gpio, const MappedInputManager::Button button) {
   if (button != MappedInputManager::Button::PageBack && button != MappedInputManager::Button::PageForward) {
     return false;
   }
 
-  const auto touchPoint = gpio.getTouchPoint();
+  const auto touchPoint = appTouchPoint(gpio.getTouchPoint());
   if (!touchPoint.valid || touchPoint.timestamp == lastConsumedTouchPageTurnAt ||
       millis() - touchPoint.timestamp >= 1500) {
     return false;
   }
 
-  const int touchWidth =
-      BoardConfig::ACTIVE.displayWidth > BoardConfig::ACTIVE.displayHeight ? BoardConfig::ACTIVE.displayWidth
-                                                                           : BoardConfig::ACTIVE.displayHeight;
-  const bool prev = touchPoint.x < touchWidth / 3;
-  const bool next = touchPoint.x >= (touchWidth * 2) / 3;
+  const int width = touchWidth();
+  const bool prev = touchPoint.x < width / 3;
+  const bool next = touchPoint.x >= (width * 2) / 3;
   const bool matched = (button == MappedInputManager::Button::PageBack && prev) ||
                        (button == MappedInputManager::Button::PageForward && next);
   if (!matched) {
@@ -29,7 +60,7 @@ bool touchPageTurnFor(const HalGPIO& gpio, const MappedInputManager::Button butt
   }
 
   lastConsumedTouchPageTurnAt = touchPoint.timestamp;
-  LOG_DBG("TOUCH", "reader side-touch x=%u y=%u width=%d button=%s", touchPoint.x, touchPoint.y, touchWidth,
+  LOG_DBG("TOUCH", "reader side-touch x=%u y=%u width=%d button=%s", touchPoint.x, touchPoint.y, width,
           button == MappedInputManager::Button::PageBack ? "back" : "forward");
   return true;
 }
@@ -111,7 +142,7 @@ bool MappedInputManager::wasTouchPressed() const { return gpio.wasTouchPressed()
 
 bool MappedInputManager::wasTouchReleased() const { return gpio.wasTouchReleased(); }
 
-InputManager::TouchPoint MappedInputManager::getTouchPoint() const { return gpio.getTouchPoint(); }
+InputManager::TouchPoint MappedInputManager::getTouchPoint() const { return appTouchPoint(gpio.getTouchPoint()); }
 
 MappedInputManager::Labels MappedInputManager::mapLabels(const char* back, const char* confirm, const char* previous,
                                                          const char* next) const {

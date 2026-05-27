@@ -23,13 +23,13 @@ inline bool effectiveAntiAlias() {
 }
 
 inline int touchWidth() {
-  return BoardConfig::ACTIVE.displayWidth > BoardConfig::ACTIVE.displayHeight ? BoardConfig::ACTIVE.displayWidth
-                                                                              : BoardConfig::ACTIVE.displayHeight;
+  return BoardConfig::ACTIVE.displayWidth > BoardConfig::ACTIVE.displayHeight ? BoardConfig::ACTIVE.displayHeight
+                                                                              : BoardConfig::ACTIVE.displayWidth;
 }
 
 inline int touchHeight() {
-  return BoardConfig::ACTIVE.displayWidth > BoardConfig::ACTIVE.displayHeight ? BoardConfig::ACTIVE.displayHeight
-                                                                              : BoardConfig::ACTIVE.displayWidth;
+  return BoardConfig::ACTIVE.displayWidth > BoardConfig::ACTIVE.displayHeight ? BoardConfig::ACTIVE.displayWidth
+                                                                              : BoardConfig::ACTIVE.displayHeight;
 }
 
 inline bool consumeTopLeftTouchBack(const MappedInputManager& input) {

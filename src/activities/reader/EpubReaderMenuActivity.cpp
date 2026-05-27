@@ -89,15 +89,34 @@ void EpubReaderMenuActivity::loop() {
   });
 
   const auto metrics = UITheme::getInstance().getMetrics();
-  const int touchedIndex = ButtonNavigator::touchedListIndex(menuListRect(renderer), static_cast<int>(menuItems.size()),
-                                                             selectedIndex, metrics.listRowHeight);
-  if (touchedIndex >= 0) {
-    selectedIndex = touchedIndex;
-    activateSelectedItem();
+  const Rect listRect = menuListRect(renderer);
+  if (mappedInput.isTouchPressed()) {
+    const auto touchPoint = mappedInput.getTouchPoint();
+    if (touchDownAt == 0 && touchPoint.valid && millis() - touchPoint.timestamp < 1000) {
+      touchDownAt = touchPoint.timestamp;
+      touchDownIndex = ButtonNavigator::currentTouchListIndex(listRect, static_cast<int>(menuItems.size()),
+                                                              selectedIndex, metrics.listRowHeight);
+      if (touchDownIndex >= 0) {
+        selectedIndex = touchDownIndex;
+        requestUpdate(true);
+      }
+    }
     return;
   }
 
-  if (!ButtonNavigator::hasFreshTouch() && mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
+  if (touchDownAt != 0 && mappedInput.wasTouchReleased()) {
+    const int releaseIndex = ButtonNavigator::currentTouchListIndex(listRect, static_cast<int>(menuItems.size()),
+                                                                    selectedIndex, metrics.listRowHeight);
+    const bool sameItem = releaseIndex < 0 || releaseIndex == touchDownIndex;
+    touchDownAt = 0;
+    if (touchDownIndex >= 0 && sameItem) {
+      activateSelectedItem();
+    }
+    touchDownIndex = -1;
+    return;
+  }
+
+  if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     activateSelectedItem();
     return;
   }

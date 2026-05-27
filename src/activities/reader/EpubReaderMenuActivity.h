@@ -46,6 +46,8 @@ class EpubReaderMenuActivity final : public Activity {
   const std::vector<MenuItem> menuItems;
 
   int selectedIndex = 0;
+  unsigned long touchDownAt = 0;
+  int touchDownIndex = -1;
 
   ButtonNavigator buttonNavigator;
   std::string title = "Reader Menu";
