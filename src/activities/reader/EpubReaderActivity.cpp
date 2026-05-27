@@ -246,6 +246,39 @@ void EpubReaderActivity::loop() {
     }
   }
 
+  if (mappedInput.wasTouchPressed()) {
+    const auto touchPoint = mappedInput.getTouchPoint();
+    if (touchPoint.valid) {
+      const bool nextTriggered = touchPoint.x >= renderer.getScreenWidth() / 2;
+      const bool prevTriggered = !nextTriggered;
+
+      // At end of the book, forward touch goes home and back touch returns to the last page.
+      if (currentSpineIndex > 0 && currentSpineIndex >= epub->getSpineItemsCount()) {
+        if (nextTriggered) {
+          onGoHome();
+        } else {
+          currentSpineIndex = epub->getSpineItemsCount() - 1;
+          nextPageNumber = 0;
+          pendingPageJump = std::numeric_limits<uint16_t>::max();
+          requestUpdate();
+        }
+        return;
+      }
+
+      if (!section) {
+        requestUpdate();
+        return;
+      }
+
+      if (prevTriggered) {
+        pageTurn(false);
+      } else {
+        pageTurn(true);
+      }
+      return;
+    }
+  }
+
   // Enter reader menu activity.
   if (mappedInput.wasReleased(MappedInputManager::Button::Confirm)) {
     const int currentPage = section ? section->currentPage + 1 : 0;

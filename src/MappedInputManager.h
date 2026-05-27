@@ -22,6 +22,11 @@ class MappedInputManager {
   bool wasAnyPressed() const;
   bool wasAnyReleased() const;
   unsigned long getHeldTime() const;
+  bool hasTouch() const;
+  bool isTouchPressed() const;
+  bool wasTouchPressed() const;
+  bool wasTouchReleased() const;
+  InputManager::TouchPoint getTouchPoint() const;
   Labels mapLabels(const char* back, const char* confirm, const char* previous, const char* next) const;
   // Returns the raw front button index that was pressed this frame (or -1 if none).
   int getPressedFrontButton() const;

@@ -66,6 +66,16 @@ bool MappedInputManager::wasAnyReleased() const { return gpio.wasAnyReleased(); 
 
 unsigned long MappedInputManager::getHeldTime() const { return gpio.getHeldTime(); }
 
+bool MappedInputManager::hasTouch() const { return gpio.hasTouch(); }
+
+bool MappedInputManager::isTouchPressed() const { return gpio.isTouchPressed(); }
+
+bool MappedInputManager::wasTouchPressed() const { return gpio.wasTouchPressed(); }
+
+bool MappedInputManager::wasTouchReleased() const { return gpio.wasTouchReleased(); }
+
+InputManager::TouchPoint MappedInputManager::getTouchPoint() const { return gpio.getTouchPoint(); }
+
 MappedInputManager::Labels MappedInputManager::mapLabels(const char* back, const char* confirm, const char* previous,
                                                          const char* next) const {
   // Swap previous/next labels to match the page turn direction swap in INVERTED and LANDSCAPE_CCW.

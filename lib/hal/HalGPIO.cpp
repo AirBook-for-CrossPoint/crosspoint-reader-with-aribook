@@ -236,6 +236,46 @@ unsigned long HalGPIO::getHeldTime() const { return inputMgr.getHeldTime(); }
 
 unsigned long HalGPIO::getPowerButtonHeldTime() const { return inputMgr.getPowerButtonHeldTime(); }
 
+bool HalGPIO::hasTouch() const {
+#if CROSSPOINT_EMULATED == 0
+  return inputMgr.hasTouch();
+#else
+  return false;
+#endif
+}
+
+bool HalGPIO::isTouchPressed() const {
+#if CROSSPOINT_EMULATED == 0
+  return inputMgr.isTouchPressed();
+#else
+  return false;
+#endif
+}
+
+bool HalGPIO::wasTouchPressed() const {
+#if CROSSPOINT_EMULATED == 0
+  return inputMgr.wasTouchPressed();
+#else
+  return false;
+#endif
+}
+
+bool HalGPIO::wasTouchReleased() const {
+#if CROSSPOINT_EMULATED == 0
+  return inputMgr.wasTouchReleased();
+#else
+  return false;
+#endif
+}
+
+InputManager::TouchPoint HalGPIO::getTouchPoint() const {
+#if CROSSPOINT_EMULATED == 0
+  return inputMgr.getTouchPoint();
+#else
+  return {false, 0, 0};
+#endif
+}
+
 void HalGPIO::startDeepSleep() {
   // Ensure that the power button has been released to avoid immediately turning back on if you're holding it
   while (inputMgr.isPressed(BTN_POWER)) {
