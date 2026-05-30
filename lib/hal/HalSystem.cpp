@@ -42,6 +42,7 @@ void IRAM_ATTR __wrap_panic_print_backtrace(const void* frame, int core) {
     panicStack[i].sp = 0;
   }
 
+#if defined(__riscv)
   // Copied from components/esp_system/port/arch/riscv/panic_arch.c
   uint32_t sp = (uint32_t)((RvExcFrame*)frame)->sp;
   const int per_line = 8;
@@ -63,6 +64,7 @@ void IRAM_ATTR __wrap_panic_print_backtrace(const void* frame, int core) {
       break;
     }
   }
+#endif
 
   __real_panic_print_backtrace(frame, core);
 }
