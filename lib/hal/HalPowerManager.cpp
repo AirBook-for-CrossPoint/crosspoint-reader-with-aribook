@@ -11,6 +11,14 @@
 
 HalPowerManager powerManager;  // Singleton instance
 
+namespace {
+constexpr uint8_t M5PM1_ADDR = 0x6E;
+constexpr uint8_t M5PM1_REG_VBAT_L = 0x22;
+constexpr int M5_INTERNAL_I2C_SDA = 3;
+constexpr int M5_INTERNAL_I2C_SCL = 2;
+constexpr uint32_t M5_INTERNAL_I2C_FREQ = 100000;
+}  // namespace
+
 void HalPowerManager::begin() {
   if (gpio.deviceIsX3()) {
     // X3 uses an I2C fuel gauge for battery monitoring.
@@ -18,8 +26,10 @@ void HalPowerManager::begin() {
     Wire.begin(X3_I2C_SDA, X3_I2C_SCL, X3_I2C_FREQ);
     Wire.setTimeOut(4);
     _batteryUseI2C = true;
-  } else if (gpio.deviceIsM5StackPaperColor() || BoardConfig::ACTIVE.batteryAdc < 0) {
-    _batteryCachedPercent = 100;
+  } else if (gpio.deviceIsM5StackPaperColor()) {
+    Wire.begin(M5_INTERNAL_I2C_SDA, M5_INTERNAL_I2C_SCL, M5_INTERNAL_I2C_FREQ);
+    Wire.setTimeOut(4);
+    _batteryUseM5PM1 = true;
   } else {
     pinMode(BAT_GPIO0, INPUT);
   }
@@ -97,6 +107,31 @@ void HalPowerManager::startDeepSleep(HalGPIO& gpio) const {
   esp_deep_sleep_start();
 }
 
+bool HalPowerManager::readM5PM1Register16(uint8_t reg, uint16_t& value) const {
+  Wire.beginTransmission(M5PM1_ADDR);
+  Wire.write(reg);
+  if (Wire.endTransmission(false) != 0) {
+    return false;
+  }
+
+  if (Wire.requestFrom(M5PM1_ADDR, static_cast<uint8_t>(2)) != 2 || Wire.available() < 2) {
+    return false;
+  }
+
+  const uint8_t lo = Wire.read();
+  const uint8_t hi = Wire.read();
+  value = static_cast<uint16_t>(lo) | (static_cast<uint16_t>(hi) << 8);
+  return true;
+}
+
+bool HalPowerManager::readM5PaperColorBatteryMillivolts(uint16_t& millivolts) const {
+  if (!_batteryUseM5PM1) {
+    return false;
+  }
+
+  return readM5PM1Register16(M5PM1_REG_VBAT_L, millivolts) && millivolts >= 2500 && millivolts <= 5000;
+}
+
 uint16_t HalPowerManager::getBatteryPercentage() const {
   if (_batteryUseI2C) {
     const unsigned long now = millis();
@@ -124,8 +159,21 @@ uint16_t HalPowerManager::getBatteryPercentage() const {
     _batteryLastPollMs = now;
     return _batteryCachedPercent;
   }
+  if (_batteryUseM5PM1) {
+    const unsigned long now = millis();
+    if (_batteryLastPollMs != 0 && (now - _batteryLastPollMs) < BATTERY_POLL_MS) {
+      return _batteryCachedPercent;
+    }
+
+    uint16_t millivolts = 0;
+    if (readM5PaperColorBatteryMillivolts(millivolts)) {
+      _batteryCachedPercent = BatteryMonitor::percentageFromMillivolts(millivolts);
+    }
+    _batteryLastPollMs = now;
+    return _batteryCachedPercent;
+  }
   if (BoardConfig::ACTIVE.batteryAdc < 0) {
-    return _batteryCachedPercent > 0 ? _batteryCachedPercent : 100;
+    return _batteryCachedPercent;
   }
   static const BatteryMonitor battery = BatteryMonitor(BAT_GPIO0);
 

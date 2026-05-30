@@ -20,6 +20,7 @@ class HalPowerManager {
 
   // I2C fuel gauge configuration for X3 battery monitoring
   bool _batteryUseI2C = false;                   // True if using I2C fuel gauge (X3), false for ADC (X4)
+  bool _batteryUseM5PM1 = false;                 // True if using M5PM1 PMIC voltage monitor
   mutable int _batteryCachedPercent = 0;         // Last read battery percentage (0-100)
   mutable unsigned long _batteryLastPollMs = 0;  // Timestamp of last battery read in milliseconds
 
@@ -44,6 +45,11 @@ class HalPowerManager {
   // Get battery percentage (range 0-100)
   uint16_t getBatteryPercentage() const;
 
+ private:
+  bool readM5PM1Register16(uint8_t reg, uint16_t& value) const;
+  bool readM5PaperColorBatteryMillivolts(uint16_t& millivolts) const;
+
+ public:
   // RAII helper class to manage power saving locks
   // Usage: create an instance of Lock in a scope to disable power saving, for example when running a task that needs
   // full performance. When the Lock instance is destroyed (goes out of scope), power saving will be re-enabled.
