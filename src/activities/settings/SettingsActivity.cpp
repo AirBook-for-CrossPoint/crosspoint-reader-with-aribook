@@ -1,5 +1,6 @@
 #include "SettingsActivity.h"
 
+#include <BoardConfig.h>
 #include <GfxRenderer.h>
 #include <Logging.h>
 
@@ -82,6 +83,9 @@ void SettingsActivity::rebuildSettingsLists() {
 
 void SettingsActivity::onEnter() {
   Activity::onEnter();
+  if (BoardConfig::isM5StackPaperColor()) {
+    renderer.requestFullRefreshForNextDisplay();
+  }
 
   // Reset selection to first category
   selectedCategoryIndex = 0;
@@ -94,7 +98,7 @@ void SettingsActivity::onEnter() {
   rebuildSettingsLists();
 
   // Trigger first update
-  requestUpdate();
+  requestUpdate(true);
 }
 
 void SettingsActivity::onExit() {
@@ -343,6 +347,5 @@ void SettingsActivity::render(RenderLock&&) {
   const auto labels = mappedInput.mapLabels(tr(STR_BACK), confirmLabel, tr(STR_DIR_UP), tr(STR_DIR_DOWN));
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
-  // Always use standard refresh for settings screen
-  renderer.displayBuffer();
+  renderer.displayBuffer(renderer.consumeRequestedRefreshMode());
 }

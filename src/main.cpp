@@ -427,7 +427,7 @@ void setup() {
   // skips the panel-clearing pass and the X3 initial-full-sync arming (see
   // HalDisplay::begin), so the first paint is FAST_REFRESH (~500ms) over the
   // retained frame and input dispatches against a visible UI.
-  const bool suppressBootSplash = false;
+  const bool suppressBootSplash = gpio.deviceIsM5StackPaperColor();
   const BootResume resume = isSilentReboot                            ? BootResume::Silent
                             : suppressBootSplash || !APP_STATE.showBootScreen ? BootResume::QuickResume
                                                                               : BootResume::Splash;
@@ -494,12 +494,13 @@ void setup() {
     activityManager.goToReader(path);
   }
 
-  if (resume == BootResume::Silent) {
+  if (resume == BootResume::Silent || (resume == BootResume::QuickResume && suppressBootSplash)) {
     // Block until the first paint physically completes. refreshDisplay()
     // waits on the panel BUSY pin so when this returns the user can see the
-    // new activity. Without the wait, an edge captured by gpio.update()
-    // during boot dispatches against an invisible Home and the default
-    // selectorIndex=0 opens the most-recent book.
+    // new activity. This also flushes PaperColor's boot-skip Home paint; Home
+    // only schedules a deferred update in onEnter(), and without the wait the
+    // panel can keep showing the retained pre-boot frame until the main loop
+    // later services ActivityManager.
     activityManager.requestUpdateAndWait();
     // Absorb any button held at this point into currentState as a non-edge:
     // two gpio.update() calls separated by > InputManager's 5ms debounce

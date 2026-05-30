@@ -1,5 +1,6 @@
 #include "EpubReaderActivity.h"
 
+#include <BoardConfig.h>
 #include <Epub/Page.h>
 #include <Epub/blocks/TextBlock.h>
 #include <FontCacheManager.h>
@@ -118,6 +119,9 @@ void moveFinishedBookToReadFolder(const std::string& srcPath, const std::string&
 
 void EpubReaderActivity::onEnter() {
   Activity::onEnter();
+  if (BoardConfig::isM5StackPaperColor()) {
+    renderer.requestFullRefreshForNextDisplay();
+  }
 
   if (!epub) {
     return;
@@ -705,7 +709,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
   if (currentSpineIndex == epub->getSpineItemsCount()) {
     renderer.clearScreen();
     renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_END_OF_BOOK), true, EpdFontFamily::BOLD);
-    renderer.displayBuffer();
+    renderer.displayBuffer(renderer.consumeRequestedRefreshMode());
     automaticPageTurnActive = false;
     showPendingSyncSaveError();
     return;
@@ -817,7 +821,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     LOG_DBG("ERS", "No pages to render");
     renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_EMPTY_CHAPTER), true, EpdFontFamily::BOLD);
     renderStatusBar();
-    renderer.displayBuffer();
+    renderer.displayBuffer(renderer.consumeRequestedRefreshMode());
     automaticPageTurnActive = false;
     showPendingSyncSaveError();
     return;
@@ -827,7 +831,7 @@ void EpubReaderActivity::render(RenderLock&& lock) {
     LOG_DBG("ERS", "Page out of bounds: %d (max %d)", section->currentPage, section->pageCount);
     renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_OUT_OF_BOUNDS), true, EpdFontFamily::BOLD);
     renderStatusBar();
-    renderer.displayBuffer();
+    renderer.displayBuffer(renderer.consumeRequestedRefreshMode());
     automaticPageTurnActive = false;
     showPendingSyncSaveError();
     return;

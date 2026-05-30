@@ -46,6 +46,7 @@ class GfxRenderer {
   bool fadingFix;
   bool outputInverted = false;
   uint32_t outputStateGeneration = 0;
+  mutable bool forceNextDisplayFullRefresh = false;
   uint8_t* frameBuffer = nullptr;
   uint16_t panelWidth = HalDisplay::DISPLAY_WIDTH;
   uint16_t panelHeight = HalDisplay::DISPLAY_HEIGHT;
@@ -143,6 +144,14 @@ class GfxRenderer {
   int getScreenWidth() const;
   int getScreenHeight() const;
   void displayBuffer(HalDisplay::RefreshMode refreshMode = HalDisplay::FAST_REFRESH) const;
+  void requestFullRefreshForNextDisplay() const { forceNextDisplayFullRefresh = true; }
+  HalDisplay::RefreshMode consumeRequestedRefreshMode(HalDisplay::RefreshMode fallback = HalDisplay::FAST_REFRESH) const {
+    if (forceNextDisplayFullRefresh) {
+      forceNextDisplayFullRefresh = false;
+      return HalDisplay::FULL_REFRESH;
+    }
+    return fallback;
+  }
   // EXPERIMENTAL: Windowed update - display only a rectangular region
   // void displayWindow(int x, int y, int width, int height) const;
   void invertScreen() const;

@@ -1,5 +1,6 @@
 #include "TxtReaderActivity.h"
 
+#include <BoardConfig.h>
 #include <BidiUtils.h>
 #include <FontCacheManager.h>
 #include <GfxRenderer.h>
@@ -25,6 +26,9 @@ constexpr uint8_t CACHE_VERSION = 3;          // Increment when cache format cha
 
 void TxtReaderActivity::onEnter() {
   Activity::onEnter();
+  if (BoardConfig::isM5StackPaperColor()) {
+    renderer.requestFullRefreshForNextDisplay();
+  }
 
   if (!txt) {
     return;
@@ -328,7 +332,7 @@ void TxtReaderActivity::render(RenderLock&&) {
   if (pageOffsets.empty()) {
     renderer.clearScreen();
     renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_EMPTY_FILE), true, EpdFontFamily::BOLD);
-    renderer.displayBuffer();
+    renderer.displayBuffer(renderer.consumeRequestedRefreshMode());
     return;
   }
 

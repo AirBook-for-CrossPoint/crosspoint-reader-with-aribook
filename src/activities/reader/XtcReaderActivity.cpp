@@ -7,6 +7,7 @@
 
 #include "XtcReaderActivity.h"
 
+#include <BoardConfig.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
 #include <HalStorage.h>
@@ -25,6 +26,9 @@
 
 void XtcReaderActivity::onEnter() {
   Activity::onEnter();
+  if (BoardConfig::isM5StackPaperColor()) {
+    renderer.requestFullRefreshForNextDisplay();
+  }
 
   if (!xtc) {
     return;
@@ -125,7 +129,7 @@ void XtcReaderActivity::render(RenderLock&&) {
     // Show end of book screen
     renderer.clearScreen();
     renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_END_OF_BOOK), true, EpdFontFamily::BOLD);
-    renderer.displayBuffer();
+    renderer.displayBuffer(renderer.consumeRequestedRefreshMode());
     return;
   }
 
@@ -224,7 +228,7 @@ void XtcReaderActivity::renderPage() {
     LOG_ERR("XTR", "Failed to allocate page buffer (%lu bytes)", pageBufferSize);
     renderer.clearScreen();
     renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_MEMORY_ERROR), true, EpdFontFamily::BOLD);
-    renderer.displayBuffer();
+    renderer.displayBuffer(renderer.consumeRequestedRefreshMode());
     return;
   }
 
@@ -236,7 +240,7 @@ void XtcReaderActivity::renderPage() {
     free(pageBuffer);
     renderer.clearScreen();
     renderer.drawCenteredText(UI_12_FONT_ID, 300, tr(STR_PAGE_LOAD_ERROR), true, EpdFontFamily::BOLD);
-    renderer.displayBuffer();
+    renderer.displayBuffer(renderer.consumeRequestedRefreshMode());
     return;
   }
 
