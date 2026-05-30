@@ -1,6 +1,7 @@
 #include "HomeActivity.h"
 
 #include <Bitmap.h>
+#include <BoardConfig.h>
 #include <Epub.h>
 #include <FsHelpers.h>
 #include <GfxRenderer.h>
@@ -263,7 +264,14 @@ void HomeActivity::render(RenderLock&&) {
 
   if (!firstRenderDone) {
     firstRenderDone = true;
-    requestUpdate();
+    if (BoardConfig::isM5StackPaperColor()) {
+      // PaperColor refreshes are full-panel color waveforms. Avoid the eager
+      // second Home repaint and background thumbnail-generation repaints after
+      // the first usable Home UI is already visible.
+      recentsLoaded = true;
+    } else {
+      requestUpdate();
+    }
   } else if (!recentsLoaded && !recentsLoading) {
     recentsLoading = true;
     loadRecentCovers(metrics.homeCoverHeight);

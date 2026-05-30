@@ -1,5 +1,6 @@
 #include "RoundedRaffTheme.h"
 
+#include <BoardConfig.h>
 #include <GfxRenderer.h>
 #include <HalStorage.h>
 #include <I18n.h>
@@ -383,6 +384,10 @@ void RoundedRaffTheme::drawList(const GfxRenderer& renderer, Rect rect, int item
 
 void RoundedRaffTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const char* btn2, const char* btn3,
                                        const char* btn4) const {
+  if (BoardConfig::isM5StackPaperColor()) {
+    return;
+  }
+
   const GfxRenderer::Orientation origOrientation = renderer.getOrientation();
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
 

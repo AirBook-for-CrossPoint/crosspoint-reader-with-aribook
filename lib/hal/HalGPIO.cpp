@@ -246,6 +246,13 @@ void HalGPIO::startDeepSleep() {
 }
 
 void HalGPIO::verifyPowerButtonWakeup(uint16_t requiredDurationMs, bool shortPressAllowed) {
+  if (BoardConfig::isM5StackPaperColor()) {
+    // PaperColor wakes from the same physical G1 button used for confirm/back.
+    // The wake source already proves the button was pressed; waiting for a
+    // logical BTN_POWER here would immediately put the device back to sleep.
+    return;
+  }
+
   if (shortPressAllowed) {
     // Fast path - no duration check needed
     return;
@@ -278,6 +285,10 @@ void HalGPIO::verifyPowerButtonWakeup(uint16_t requiredDurationMs, bool shortPre
 }
 
 bool HalGPIO::isUsbConnected() const {
+  if (deviceIsM5StackPaperColor() || BoardConfig::ACTIVE.usbDetect < 0) {
+    return false;
+  }
+
   if (deviceIsX3()) {
     // X3: infer USB/charging via BQ27220 Current() register (0x0C, signed mA).
     // Positive current means charging.
@@ -290,8 +301,9 @@ bool HalGPIO::isUsbConnected() const {
     }
     return false;
   }
-  // U0RXD/GPIO20 reads HIGH when USB is connected
-  return digitalRead(UART0_RXD) == HIGH;
+
+  // X4: U0RXD/GPIO20 reads HIGH when USB is connected.
+  return digitalRead(BoardConfig::ACTIVE.usbDetect) == HIGH;
 }
 
 HalGPIO::WakeupReason HalGPIO::getWakeupReason() const {

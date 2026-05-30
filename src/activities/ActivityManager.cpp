@@ -44,11 +44,8 @@ void ActivityManager::renderTaskLoop() {
       currentActivity->render(std::move(lock));
     }
     // Notify any task blocked in requestUpdateAndWait() that the render is done.
-    TaskHandle_t waiter = nullptr;
-    taskENTER_CRITICAL(nullptr);
-    waiter = waitingTaskHandle;
+    TaskHandle_t waiter = waitingTaskHandle;
     waitingTaskHandle = nullptr;
-    taskEXIT_CRITICAL(nullptr);
     if (waiter) {
       xTaskNotify(waiter, 1, eIncrement);
     }
@@ -278,8 +275,6 @@ void ActivityManager::requestUpdateAndWait() {
     return;
   }
 
-  // Atomic section to perform checks
-  taskENTER_CRITICAL(nullptr);
   auto currTaskHandler = xTaskGetCurrentTaskHandle();
   auto mutexHolder = xSemaphoreGetMutexHolder(renderingMutex);
   bool isRenderTask = (currTaskHandler == renderTaskHandle);
@@ -288,7 +283,6 @@ void ActivityManager::requestUpdateAndWait() {
   if (!alreadyWaiting && !isRenderTask && !holdingRenderLock) {
     waitingTaskHandle = currTaskHandler;
   }
-  taskEXIT_CRITICAL(nullptr);
 
   // Render task cannot call requestUpdateAndWait() or it will cause a deadlock
   assert(!isRenderTask && "Render task cannot call requestUpdateAndWait()");

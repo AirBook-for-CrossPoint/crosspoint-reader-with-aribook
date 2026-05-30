@@ -426,9 +426,10 @@ void setup() {
   // skips the panel-clearing pass and the X3 initial-full-sync arming (see
   // HalDisplay::begin), so the first paint is FAST_REFRESH (~500ms) over the
   // retained frame and input dispatches against a visible UI.
-  const BootResume resume = isSilentReboot              ? BootResume::Silent
-                            : !APP_STATE.showBootScreen ? BootResume::QuickResume
-                                                        : BootResume::Splash;
+  const bool suppressBootSplash = gpio.deviceIsM5StackPaperColor();
+  const BootResume resume = isSilentReboot                            ? BootResume::Silent
+                            : suppressBootSplash || !APP_STATE.showBootScreen ? BootResume::QuickResume
+                                                                              : BootResume::Splash;
 
   setupDisplayAndFonts(resume != BootResume::Splash);
 
@@ -438,6 +439,12 @@ void setup() {
       // panel keeps showing the pre-reboot popup until that first paint lands.
       break;
     case BootResume::QuickResume:
+      if (suppressBootSplash) {
+        // M5Stack PaperColor has a slow, visible color-panel refresh waveform.
+        // Avoid spending one full refresh on a boot splash that is immediately
+        // replaced by Home or Reader during normal routing below.
+        break;
+      }
       // One-shot flag: re-arm the splash for the next non-quick-resume boot. Save
       // before any painting so a hang in the blocking paint path can't strand
       // us in a quick-resume-with-no-frame loop on the next boot.

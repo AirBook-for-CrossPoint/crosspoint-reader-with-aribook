@@ -1,5 +1,6 @@
 #include "HalPowerManager.h"
 
+#include <BoardConfig.h>
 #include <Logging.h>
 #include <WiFi.h>
 #include <esp_sleep.h>
@@ -17,6 +18,8 @@ void HalPowerManager::begin() {
     Wire.begin(X3_I2C_SDA, X3_I2C_SCL, X3_I2C_FREQ);
     Wire.setTimeOut(4);
     _batteryUseI2C = true;
+  } else if (gpio.deviceIsM5StackPaperColor() || BoardConfig::ACTIVE.batteryAdc < 0) {
+    _batteryCachedPercent = 100;
   } else {
     pinMode(BAT_GPIO0, INPUT);
   }
@@ -120,6 +123,9 @@ uint16_t HalPowerManager::getBatteryPercentage() const {
     _batteryCachedPercent = soc > 100 ? 100 : soc;
     _batteryLastPollMs = now;
     return _batteryCachedPercent;
+  }
+  if (BoardConfig::ACTIVE.batteryAdc < 0) {
+    return _batteryCachedPercent > 0 ? _batteryCachedPercent : 100;
   }
   static const BatteryMonitor battery = BatteryMonitor(BAT_GPIO0);
 

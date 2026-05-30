@@ -1,5 +1,6 @@
 #include "LyraTheme.h"
 
+#include <BoardConfig.h>
 #include <GfxRenderer.h>
 #include <HalGPIO.h>
 #include <HalPowerManager.h>
@@ -319,6 +320,10 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
 
 void LyraTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const char* btn2, const char* btn3,
                                 const char* btn4) const {
+  if (BoardConfig::isM5StackPaperColor()) {
+    return;
+  }
+
   const GfxRenderer::Orientation orig_orientation = renderer.getOrientation();
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
 
@@ -357,6 +362,10 @@ void LyraTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
 }
 
 void LyraTheme::drawSideButtonHints(const GfxRenderer& renderer, const char* topBtn, const char* bottomBtn) const {
+  if (BoardConfig::isM5StackPaperColor()) {
+    return;
+  }
+
   const int screenWidth = renderer.getScreenWidth();
   constexpr int buttonWidth = LyraMetrics::values.sideButtonHintsWidth;  // Width on screen (height when rotated)
   constexpr int buttonHeight = 78;                                       // Height on screen (width when rotated)
