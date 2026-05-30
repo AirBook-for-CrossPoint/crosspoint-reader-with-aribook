@@ -1,4 +1,5 @@
 #include <Arduino.h>
+#include <BoardConfig.h>
 #include <Epub.h>
 #include <FontCacheManager.h>
 #include <FontDecompressor.h>
@@ -515,6 +516,33 @@ void setup() {
   allowSleepAt = millis() + 2000;
 }
 
+bool handlePaperColorSideButtonInvertChord() {
+  if (!BoardConfig::isM5StackPaperColor()) {
+    return false;
+  }
+
+  static bool chordArmed = true;
+  const bool sideButtonsPressed = gpio.isPressed(HalGPIO::BTN_UP) && gpio.isPressed(HalGPIO::BTN_DOWN);
+  if (!sideButtonsPressed) {
+    chordArmed = true;
+    return false;
+  }
+
+  if (!chordArmed) {
+    return true;
+  }
+
+  chordArmed = false;
+  {
+    RenderLock lock;
+    const bool inverted = renderer.toggleOutputInverted();
+    renderer.invertScreen();
+    renderer.displayBuffer(HalDisplay::FAST_REFRESH);
+    LOG_DBG("MAIN", "PaperColor side-button display inversion: %s", inverted ? "on" : "off");
+  }
+  return true;
+}
+
 void loop() {
   static unsigned long maxLoopDuration = 0;
   const unsigned long loopStartTime = millis();
@@ -578,6 +606,10 @@ void loop() {
     }
     screenshotButtonsReleased = true;
     screenshotComboActive = false;
+  }
+
+  if (handlePaperColorSideButtonInvertChord()) {
+    return;
   }
 
   const unsigned long sleepTimeoutMs = SETTINGS.getSleepTimeoutMs();

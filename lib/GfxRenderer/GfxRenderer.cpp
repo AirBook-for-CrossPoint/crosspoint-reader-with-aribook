@@ -350,7 +350,8 @@ void GfxRenderer::drawPixel(const int x, const int y, const bool state) const {
   const uint32_t byteIndex = rowY * panelWidthBytes + (phyX / 8);
   const uint8_t bitPosition = 7 - (phyX % 8);  // MSB first
 
-  if (state) {
+  const bool pixelState = outputInverted ? !state : state;
+  if (pixelState) {
     target[byteIndex] &= ~(1 << bitPosition);  // Clear bit
   } else {
     target[byteIndex] |= 1 << bitPosition;  // Set bit
@@ -1128,12 +1129,13 @@ static unsigned long start_ms = 0;
 
 void GfxRenderer::clearScreen(const uint8_t color) const {
   start_ms = millis();
+  const uint8_t targetColor = outputInverted ? ~color : color;
   if (_stripActive) {
     // Clear only the active band's scratch, not the shared framebuffer.
-    memset(_stripBuf, color, static_cast<size_t>(panelWidthBytes) * _stripRows);
+    memset(_stripBuf, targetColor, static_cast<size_t>(panelWidthBytes) * _stripRows);
     return;
   }
-  display.clearScreen(color);
+  display.clearScreen(targetColor);
 }
 
 void GfxRenderer::beginStripTarget(uint8_t* scratch, int stripY0, int stripRows) const {

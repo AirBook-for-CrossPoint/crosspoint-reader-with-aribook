@@ -44,6 +44,7 @@ class GfxRenderer {
   RenderMode renderMode;
   Orientation orientation;
   bool fadingFix;
+  bool outputInverted = false;
   uint8_t* frameBuffer = nullptr;
   uint16_t panelWidth = HalDisplay::DISPLAY_WIDTH;
   uint16_t panelHeight = HalDisplay::DISPLAY_HEIGHT;
@@ -123,6 +124,12 @@ class GfxRenderer {
 
   // Fading fix control
   void setFadingFix(const bool enabled) { fadingFix = enabled; }
+  void setOutputInverted(const bool enabled) { outputInverted = enabled; }
+  bool isOutputInverted() const { return outputInverted; }
+  bool toggleOutputInverted() {
+    outputInverted = !outputInverted;
+    return outputInverted;
+  }
 
   // Screen ops
   int getScreenWidth() const;
