@@ -13,6 +13,26 @@
 
 UITheme UITheme::instance;
 
+namespace {
+struct SdThemeSelection {
+  LyraTheme::Variant variant = LyraTheme::Variant::Standard;
+};
+
+SdThemeSelection selectionFor(const SdCardThemeInfo& themeInfo) {
+  switch (themeInfo.layout) {
+    case SdThemeLayout::ThreeCovers:
+      return {LyraTheme::Variant::ThreeCovers};
+    case SdThemeLayout::RoundedRaff:
+      return {LyraTheme::Variant::RoundedRaff};
+    case SdThemeLayout::Carousel:
+      return {LyraTheme::Variant::Carousel};
+    case SdThemeLayout::Lyra:
+    default:
+      return {LyraTheme::Variant::Standard};
+  }
+}
+}  // namespace
+
 UITheme::UITheme() {
   auto themeType = static_cast<CrossPointSettings::UI_THEME>(SETTINGS.uiTheme);
   setTheme(themeType);
@@ -32,13 +52,15 @@ void UITheme::reload() {
       return;
     }
 
-    switch (themeInfo->rendererHint) {
-      case SdThemeRendererHint::Carousel:
-      case SdThemeRendererHint::Lyra:
-      default:
-        setTheme(CrossPointSettings::UI_THEME::LYRA);
-        return;
-    }
+    const SdThemeSelection selection = selectionFor(*themeInfo);
+    LOG_DBG("UI", "Using SD theme: %s", themeInfo->id.c_str());
+    currentSdMetrics = themeInfo->metrics;
+    currentSdHomeRecents = themeInfo->homeRecents;
+    const ThemeHomeRecentsSpec* homeRecents =
+        currentSdHomeRecents.type == ThemeHomeRecentsType::CoverStrip ? &currentSdHomeRecents : nullptr;
+    currentTheme = std::make_unique<LyraTheme>(selection.variant, &currentSdMetrics, homeRecents);
+    currentMetrics = &currentSdMetrics;
+    return;
   }
 
   setTheme(CrossPointSettings::UI_THEME::LYRA);

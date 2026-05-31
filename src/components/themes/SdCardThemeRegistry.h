@@ -3,7 +3,10 @@
 #include <string>
 #include <vector>
 
+#include "components/themes/BaseTheme.h"
+
 enum class SdThemeRendererHint { Lyra, Carousel };
+enum class SdThemeLayout { Lyra, ThreeCovers, RoundedRaff, Carousel };
 
 struct SdThemeDeviceConstraints {
   int screenWidth = 0;
@@ -18,6 +21,9 @@ struct SdCardThemeInfo {
   std::string path;
   std::string inherits;
   std::string deviceId;
+  SdThemeLayout layout = SdThemeLayout::Lyra;
+  ThemeMetrics metrics = {};
+  ThemeHomeRecentsSpec homeRecents;
   SdThemeDeviceConstraints constraints;
   SdThemeRendererHint rendererHint = SdThemeRendererHint::Lyra;
 };
@@ -42,6 +48,7 @@ class SdCardThemeRegistry {
   static const char* activeDeviceId();
   static bool parseThemeJson(const char* themeDirPath, SdCardThemeInfo& out);
   static bool isSafeId(const char* value);
+  static SdThemeLayout layoutFor(const char* id, const char* componentModule, const char* layout);
   static SdThemeRendererHint rendererHintFor(const char* id, const char* componentModule);
   static void scanRoot(const char* rootPath, std::vector<SdCardThemeInfo>& out);
 };

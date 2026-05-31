@@ -7,35 +7,54 @@
   "requires": {
     "crosspoint": {
       "schema": 1,
-      "modules": ["carousel"]
+      "modules": ["cover-strip"]
     }
+  },
+  "metrics": {
+    "homeCoverHeight": 300,
+    "homeCoverTileHeight": 340,
+    "homeRecentBooksCount": 3
   },
   "components": {
     "homeRecents": {
+      "type": "cover-strip",
       "module": "carousel",
-      "centerCover": {
-        "maxWidth": 340,
-        "maxHeight": 540,
-        "visualInset": 10,
-        "cornerRadius": 6,
-        "selectionLineWidth": 3
-      },
-      "sideCovers": {
-        "enabled": true,
-        "nearWidthPercent": 26,
-        "farWidthPercent": 21,
-        "perspective": true
-      },
-      "title": {
-        "font": "ui12",
-        "style": "bold",
-        "maxLines": 2
-      },
-      "indicators": {
-        "type": "dots",
-        "size": 8,
-        "gap": 6
-      }
+      "maxBooks": 3,
+      "wrap": true,
+      "selectionLineWidth": 3,
+      "selectionCornerRadius": 6,
+      "slots": [
+        {
+          "book": "previous",
+          "x": "padding",
+          "y": "center",
+          "height": 225,
+          "widthPercent": 62
+        },
+        {
+          "book": "selected",
+          "x": "center",
+          "y": "top",
+          "height": 300,
+          "widthPercent": 62,
+          "yOffset": 8,
+          "selected": true,
+          "title": {
+            "enabled": true,
+            "font": "ui12",
+            "style": "bold",
+            "maxLines": 2,
+            "offsetY": 12
+          }
+        },
+        {
+          "book": "next",
+          "x": "right-padding",
+          "y": "center",
+          "height": 225,
+          "widthPercent": 62
+        }
+      ]
     }
   },
   "assets": {
@@ -67,10 +86,38 @@
       },
       "components": {
         "homeRecents": {
-          "centerCover": {
-            "maxWidth": 320,
-            "maxHeight": 500
-          }
+          "slots": [
+            {
+              "book": "previous",
+              "x": "padding",
+              "y": "center",
+              "height": 210,
+              "widthPercent": 62
+            },
+            {
+              "book": "selected",
+              "x": "center",
+              "y": "top",
+              "height": 280,
+              "widthPercent": 62,
+              "yOffset": 8,
+              "selected": true,
+              "title": {
+                "enabled": true,
+                "font": "ui12",
+                "style": "bold",
+                "maxLines": 2,
+                "offsetY": 12
+              }
+            },
+            {
+              "book": "next",
+              "x": "right-padding",
+              "y": "center",
+              "height": 210,
+              "widthPercent": 62
+            }
+          ]
         }
       }
     },

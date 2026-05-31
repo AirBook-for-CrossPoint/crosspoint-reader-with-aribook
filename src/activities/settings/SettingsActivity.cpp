@@ -20,7 +20,6 @@
 #include "SdCardFontSystem.h"
 #include "SdFirmwareUpdateActivity.h"
 #include "SettingsList.h"
-#include "SilentRestart.h"
 #include "StatusBarSettingsActivity.h"
 #include "ThemeDownloadActivity.h"
 #include "activities/network/WifiSelectionActivity.h"
@@ -288,7 +287,9 @@ void SettingsActivity::toggleCurrentSetting() {
   syncQuickResumeTimeoutForSleepScreen(sleepScreenChanged, quickResumeTimeoutChanged);
   SETTINGS.saveToFile();
   if (themeChanged) {
-    silentRestart();
+    UITheme::getInstance().reload();
+    rebuildSettingsLists();
+    requestUpdate();
   }
 }
 

@@ -4,10 +4,69 @@
   "name": "Lyra 3 Covers",
   "description": "Lyra home layout with three recent cover slots.",
   "inherits": "lyra",
+  "metrics": {
+    "homeCoverTileHeight": 300,
+    "homeRecentBooksCount": 3
+  },
   "components": {
     "homeRecents": {
       "module": "lyra",
-      "layout": "three-covers"
+      "layout": "three-covers",
+      "type": "cover-strip",
+      "maxBooks": 3,
+      "wrap": false,
+      "selectionLineWidth": 2,
+      "selectionCornerRadius": 6,
+      "slots": [
+        {
+          "book": "index",
+          "bookIndex": 0,
+          "x": "padding",
+          "y": "top",
+          "height": 226,
+          "widthPercent": 62,
+          "selected": true,
+          "title": {
+            "enabled": true,
+            "font": "ui10",
+            "style": "regular",
+            "maxLines": 3,
+            "offsetY": 12
+          }
+        },
+        {
+          "book": "index",
+          "bookIndex": 1,
+          "x": "center",
+          "y": "top",
+          "height": 226,
+          "widthPercent": 62,
+          "selected": true,
+          "title": {
+            "enabled": true,
+            "font": "ui10",
+            "style": "regular",
+            "maxLines": 3,
+            "offsetY": 12
+          }
+        },
+        {
+          "book": "index",
+          "bookIndex": 2,
+          "x": "right-padding",
+          "y": "top",
+          "height": 226,
+          "widthPercent": 62,
+          "selected": true,
+          "title": {
+            "enabled": true,
+            "font": "ui10",
+            "style": "regular",
+            "maxLines": 3,
+            "offsetY": 12
+          }
+        }
+      ]
     }
   },
   "assets": {

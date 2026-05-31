@@ -97,6 +97,41 @@ struct ThemeMetrics {
   int textFieldLineEndOffset;
 };
 
+enum class ThemeHomeRecentsType { Default, CoverStrip };
+enum class ThemeBookRef { Previous, Selected, Next, Index };
+enum class ThemeSlotX { Padding, Center, RightPadding };
+enum class ThemeSlotY { Top, Center };
+
+struct ThemeTitleSpec {
+  bool enabled = false;
+  int fontId = 12;
+  bool bold = true;
+  int maxLines = 2;
+  int offsetY = 12;
+};
+
+struct ThemeCoverSlotSpec {
+  ThemeBookRef book = ThemeBookRef::Selected;
+  int bookIndex = 0;
+  ThemeSlotX x = ThemeSlotX::Center;
+  ThemeSlotY y = ThemeSlotY::Top;
+  int height = 300;
+  int widthPercent = 62;
+  int xOffset = 0;
+  int yOffset = 0;
+  bool selected = false;
+  ThemeTitleSpec title;
+};
+
+struct ThemeHomeRecentsSpec {
+  ThemeHomeRecentsType type = ThemeHomeRecentsType::Default;
+  int maxBooks = 1;
+  bool wrap = false;
+  int selectionLineWidth = 3;
+  int selectionCornerRadius = 6;
+  std::vector<ThemeCoverSlotSpec> slots;
+};
+
 enum UIIcon { None = 0, Folder, Text, Image, Book, File, Recent, Settings, Transfer, Library, Wifi, Hotspot, Bookmark };
 
 enum class KeyboardKeyType { Normal, Shift, Mode, Space, Del, Ok, Disabled };

@@ -9,8 +9,208 @@
 #include <cctype>
 #include <cstring>
 
+#include "components/themes/lyra/LyraTheme.h"
+#include "fontIds.h"
+
 namespace {
 constexpr int THEME_SCHEMA_VERSION = 1;
+
+void applyMetricOverrides(JsonObjectConst obj, ThemeMetrics& metrics) {
+  if (obj.isNull()) return;
+#define APPLY_INT_FIELD(name) metrics.name = obj[#name] | metrics.name
+#define APPLY_BOOL_FIELD(name) metrics.name = obj[#name] | metrics.name
+  APPLY_INT_FIELD(batteryWidth);
+  APPLY_INT_FIELD(batteryHeight);
+  APPLY_INT_FIELD(topPadding);
+  APPLY_INT_FIELD(batteryBarHeight);
+  APPLY_INT_FIELD(headerHeight);
+  APPLY_INT_FIELD(verticalSpacing);
+  APPLY_INT_FIELD(contentSidePadding);
+  APPLY_INT_FIELD(listRowHeight);
+  APPLY_INT_FIELD(listWithSubtitleRowHeight);
+  APPLY_INT_FIELD(menuRowHeight);
+  APPLY_INT_FIELD(menuSpacing);
+  APPLY_INT_FIELD(tabSpacing);
+  APPLY_INT_FIELD(tabBarHeight);
+  APPLY_INT_FIELD(scrollBarWidth);
+  APPLY_INT_FIELD(scrollBarRightOffset);
+  APPLY_INT_FIELD(homeTopPadding);
+  APPLY_INT_FIELD(homeCoverHeight);
+  APPLY_INT_FIELD(homeCoverTileHeight);
+  APPLY_INT_FIELD(homeRecentBooksCount);
+  APPLY_BOOL_FIELD(homeContinueReadingInMenu);
+  APPLY_INT_FIELD(homeMenuTopOffset);
+  APPLY_INT_FIELD(buttonHintsHeight);
+  APPLY_INT_FIELD(sideButtonHintsWidth);
+  APPLY_INT_FIELD(progressBarHeight);
+  APPLY_INT_FIELD(progressBarMarginTop);
+  APPLY_INT_FIELD(statusBarHorizontalMargin);
+  APPLY_INT_FIELD(statusBarVerticalMargin);
+  APPLY_INT_FIELD(keyboardKeyWidth);
+  APPLY_INT_FIELD(keyboardKeyHeight);
+  APPLY_INT_FIELD(keyboardKeySpacing);
+  APPLY_INT_FIELD(keyboardBottomKeyHeight);
+  APPLY_INT_FIELD(keyboardBottomKeySpacing);
+  APPLY_BOOL_FIELD(keyboardBottomAligned);
+  APPLY_BOOL_FIELD(keyboardCenteredText);
+  APPLY_INT_FIELD(keyboardVerticalOffset);
+  APPLY_INT_FIELD(keyboardTextFieldWidthPercent);
+  APPLY_INT_FIELD(keyboardWidthPercent);
+  APPLY_INT_FIELD(keyboardKeyCornerRadius);
+  APPLY_BOOL_FIELD(keyboardFillUnselected);
+  APPLY_BOOL_FIELD(keyboardOutlineAllUnselected);
+  APPLY_BOOL_FIELD(keyboardDrawSpecialOutlineWhenUnselected);
+  APPLY_INT_FIELD(keyboardSecondaryLabelRightPadding);
+  APPLY_INT_FIELD(keyboardSecondaryLabelTopPadding);
+  APPLY_INT_FIELD(keyboardMinArrowHeadSize);
+  metrics.popupTopOffsetRatio = obj["popupTopOffsetRatio"] | metrics.popupTopOffsetRatio;
+  APPLY_INT_FIELD(popupMarginX);
+  APPLY_INT_FIELD(popupMarginY);
+  APPLY_INT_FIELD(popupFrameThickness);
+  APPLY_INT_FIELD(popupCornerRadius);
+  APPLY_BOOL_FIELD(popupTextBold);
+  APPLY_BOOL_FIELD(popupTextInverted);
+  APPLY_INT_FIELD(popupTextBaselineOffsetY);
+  APPLY_INT_FIELD(popupProgressBarHeight);
+  APPLY_BOOL_FIELD(popupProgressDrawOutline);
+  APPLY_BOOL_FIELD(popupProgressClampPercent);
+  APPLY_BOOL_FIELD(popupProgressFillInverted);
+  APPLY_BOOL_FIELD(popupProgressOutlineInverted);
+  APPLY_INT_FIELD(textFieldHorizontalPadding);
+  APPLY_INT_FIELD(textFieldNormalThickness);
+  APPLY_INT_FIELD(textFieldCursorThickness);
+  APPLY_INT_FIELD(textFieldLineEndOffset);
+#undef APPLY_BOOL_FIELD
+#undef APPLY_INT_FIELD
+}
+
+ThemeSlotX parseSlotX(const char* value) {
+  if (value == nullptr) return ThemeSlotX::Center;
+  if (strcmp(value, "padding") == 0) return ThemeSlotX::Padding;
+  if (strcmp(value, "right-padding") == 0) return ThemeSlotX::RightPadding;
+  return ThemeSlotX::Center;
+}
+
+ThemeSlotY parseSlotY(const char* value) {
+  if (value == nullptr) return ThemeSlotY::Top;
+  if (strcmp(value, "center") == 0 || strcmp(value, "centerY") == 0) return ThemeSlotY::Center;
+  return ThemeSlotY::Top;
+}
+
+ThemeBookRef parseBookRef(const char* value) {
+  if (value == nullptr) return ThemeBookRef::Selected;
+  if (strcmp(value, "previous") == 0) return ThemeBookRef::Previous;
+  if (strcmp(value, "next") == 0) return ThemeBookRef::Next;
+  if (strcmp(value, "index") == 0) return ThemeBookRef::Index;
+  return ThemeBookRef::Selected;
+}
+
+void parseTitleSpec(JsonObjectConst obj, ThemeTitleSpec& title) {
+  if (obj.isNull()) return;
+  title.enabled = obj["enabled"] | true;
+  title.fontId = obj["fontId"] | title.fontId;
+  const char* font = obj["font"] | nullptr;
+  if (font != nullptr) {
+    if (strcmp(font, "ui10") == 0) {
+      title.fontId = UI_10_FONT_ID;
+    } else if (strcmp(font, "small") == 0) {
+      title.fontId = SMALL_FONT_ID;
+    } else {
+      title.fontId = UI_12_FONT_ID;
+    }
+  } else if (title.fontId == 10) {
+    title.fontId = UI_10_FONT_ID;
+  } else if (title.fontId == 12) {
+    title.fontId = UI_12_FONT_ID;
+  }
+  title.bold = obj["bold"] | title.bold;
+  title.maxLines = obj["maxLines"] | title.maxLines;
+  title.offsetY = obj["offsetY"] | title.offsetY;
+
+  const char* style = obj["style"] | nullptr;
+  if (style != nullptr) {
+    title.bold = strcmp(style, "bold") == 0;
+  }
+}
+
+void parseCoverSlot(JsonObjectConst obj, ThemeCoverSlotSpec& slot) {
+  if (obj.isNull()) return;
+  slot.book = parseBookRef(obj["book"] | nullptr);
+  slot.bookIndex = obj["bookIndex"] | slot.bookIndex;
+  slot.x = parseSlotX(obj["x"] | nullptr);
+  slot.y = parseSlotY(obj["y"] | nullptr);
+  slot.height = obj["height"] | slot.height;
+  slot.widthPercent = obj["widthPercent"] | slot.widthPercent;
+  slot.xOffset = obj["xOffset"] | slot.xOffset;
+  slot.yOffset = obj["yOffset"] | slot.yOffset;
+  slot.selected = obj["selected"] | slot.selected;
+  parseTitleSpec(obj["title"].as<JsonObjectConst>(), slot.title);
+}
+
+void parseHomeRecentsSpec(JsonObjectConst obj, ThemeHomeRecentsSpec& spec) {
+  if (obj.isNull()) return;
+  const char* type = obj["type"] | nullptr;
+  if (type != nullptr && strcmp(type, "cover-strip") == 0) {
+    spec.type = ThemeHomeRecentsType::CoverStrip;
+  }
+  spec.maxBooks = obj["maxBooks"] | spec.maxBooks;
+  spec.wrap = obj["wrap"] | spec.wrap;
+  spec.selectionLineWidth = obj["selectionLineWidth"] | spec.selectionLineWidth;
+  spec.selectionCornerRadius = obj["selectionCornerRadius"] | spec.selectionCornerRadius;
+
+  JsonArrayConst slots = obj["slots"].as<JsonArrayConst>();
+  if (!slots.isNull()) {
+    spec.slots.clear();
+    for (JsonObjectConst slotObj : slots) {
+      if (spec.slots.size() >= 5) break;
+      ThemeCoverSlotSpec slot;
+      parseCoverSlot(slotObj, slot);
+      spec.slots.push_back(slot);
+    }
+  }
+}
+
+ThemeMetrics defaultMetricsFor(SdThemeLayout layout) {
+  ThemeMetrics metrics = LyraMetrics::values;
+  switch (layout) {
+    case SdThemeLayout::ThreeCovers:
+      metrics.homeCoverTileHeight = 300;
+      metrics.homeRecentBooksCount = 3;
+      break;
+    case SdThemeLayout::Carousel:
+      metrics.homeCoverHeight = 300;
+      metrics.homeCoverTileHeight = 340;
+      metrics.homeRecentBooksCount = 3;
+      break;
+    case SdThemeLayout::RoundedRaff:
+      metrics.topPadding = 0;
+      metrics.headerHeight = 45;
+      metrics.listRowHeight = 42;
+      metrics.listWithSubtitleRowHeight = 69;
+      metrics.menuRowHeight = 42;
+      metrics.menuSpacing = 6;
+      metrics.homeTopPadding = 55;
+      metrics.homeCoverHeight = 300;
+      metrics.homeCoverTileHeight = 350;
+      metrics.homeContinueReadingInMenu = true;
+      metrics.homeMenuTopOffset = 20;
+      metrics.keyboardKeyHeight = 30;
+      metrics.keyboardKeySpacing = 10;
+      metrics.keyboardBottomKeyHeight = 30;
+      metrics.keyboardKeyCornerRadius = 10;
+      metrics.keyboardFillUnselected = true;
+      metrics.keyboardOutlineAllUnselected = true;
+      metrics.popupCornerRadius = 18;
+      metrics.popupTextBold = true;
+      metrics.popupProgressDrawOutline = true;
+      metrics.popupProgressClampPercent = true;
+      break;
+    case SdThemeLayout::Lyra:
+    default:
+      break;
+  }
+  return metrics;
+}
 }  // namespace
 
 const char* SdCardThemeRegistry::activeDeviceId() { return gpio.deviceIsX3() ? "x3" : "x4"; }
@@ -35,6 +235,21 @@ SdThemeRendererHint SdCardThemeRegistry::rendererHintFor(const char* id, const c
     if (strcmp(id, "roundedraff") == 0 || strcmp(id, "RoundedRaff") == 0) return SdThemeRendererHint::Lyra;
   }
   return SdThemeRendererHint::Lyra;
+}
+
+SdThemeLayout SdCardThemeRegistry::layoutFor(const char* id, const char* componentModule, const char* layout) {
+  if (componentModule != nullptr && strcmp(componentModule, "carousel") == 0) return SdThemeLayout::Carousel;
+  if (layout != nullptr) {
+    if (strcmp(layout, "three-covers") == 0) return SdThemeLayout::ThreeCovers;
+    if (strcmp(layout, "roundedraff") == 0) return SdThemeLayout::RoundedRaff;
+    if (strcmp(layout, "carousel") == 0) return SdThemeLayout::Carousel;
+  }
+  if (id != nullptr) {
+    if (strcmp(id, "lyra-3-covers") == 0 || strcmp(id, "LYRA_3_COVERS") == 0) return SdThemeLayout::ThreeCovers;
+    if (strcmp(id, "roundedraff") == 0 || strcmp(id, "RoundedRaff") == 0) return SdThemeLayout::RoundedRaff;
+    if (strcmp(id, "carousel") == 0) return SdThemeLayout::Carousel;
+  }
+  return SdThemeLayout::Lyra;
 }
 
 bool SdCardThemeRegistry::parseThemeJson(const char* themeDirPath, SdCardThemeInfo& out) {
@@ -73,12 +288,23 @@ bool SdCardThemeRegistry::parseThemeJson(const char* themeDirPath, SdCardThemeIn
   const char* inherits = deviceObj["inherits"] | doc["inherits"] | "lyra";
   const char* homeRecentsModule =
       deviceObj["components"]["homeRecents"]["module"] | doc["components"]["homeRecents"]["module"] | nullptr;
+  const char* homeRecentsLayout =
+      deviceObj["components"]["homeRecents"]["layout"] | doc["components"]["homeRecents"]["layout"] | nullptr;
 
   out.id = id;
   out.name = name;
   out.path = themeDirPath;
   out.inherits = inherits;
   out.deviceId = deviceId;
+  out.layout = layoutFor(id, homeRecentsModule, homeRecentsLayout);
+  out.metrics = defaultMetricsFor(out.layout);
+  parseHomeRecentsSpec(doc["components"]["homeRecents"].as<JsonObjectConst>(), out.homeRecents);
+  parseHomeRecentsSpec(deviceObj["components"]["homeRecents"].as<JsonObjectConst>(), out.homeRecents);
+  if (out.homeRecents.type == ThemeHomeRecentsType::CoverStrip) {
+    out.metrics.homeRecentBooksCount = std::max(1, out.homeRecents.maxBooks);
+  }
+  applyMetricOverrides(doc["metrics"].as<JsonObjectConst>(), out.metrics);
+  applyMetricOverrides(deviceObj["metrics"].as<JsonObjectConst>(), out.metrics);
   out.constraints.screenWidth = deviceObj["constraints"]["screenWidth"] | doc["constraints"]["screenWidth"] | 0;
   out.constraints.screenHeight = deviceObj["constraints"]["screenHeight"] | doc["constraints"]["screenHeight"] | 0;
   out.constraints.frontButtons = deviceObj["constraints"]["frontButtons"] | doc["constraints"]["frontButtons"] | 0;
