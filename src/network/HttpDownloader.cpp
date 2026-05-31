@@ -57,7 +57,7 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
   // scheme, so http:// needs no cert config). The prior setInsecure() worked
   // only because Arduino's ssl_client drives mbedtls directly.
   config.crt_bundle_attach = esp_crt_bundle_attach;
-  config.keep_alive_enable = true;
+  config.keep_alive_enable = false;
 
   esp_http_client_handle_t client = esp_http_client_init(&config);
   if (!client) {
@@ -66,6 +66,7 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
   }
 
   esp_http_client_set_header(client, "User-Agent", "CrossPoint-ESP32-" CROSSPOINT_VERSION);
+  esp_http_client_set_header(client, "Connection", "close");
   if (!username.empty() && !password.empty()) {
     // Preemptive Basic auth, like the prior addHeader; don't wait for a 401.
     const std::string credentials = username + ":" + password;
@@ -131,6 +132,7 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
     }
     sink.downloaded += read;
     if (sink.progress && sink.total > 0) sink.progress(sink.downloaded, sink.total);
+    if (sink.total > 0 && sink.downloaded >= sink.total) break;
   }
 
   const bool complete = esp_http_client_is_complete_data_received(client);
