@@ -4,6 +4,7 @@
 #include <GfxRenderer.h>
 #include <Logging.h>
 
+#include <algorithm>
 #include <memory>
 
 #include "MappedInputManager.h"
@@ -19,6 +20,23 @@ UITheme::UITheme() {
 }
 
 void UITheme::refreshRegistry() { themeRegistry.discover(); }
+
+std::vector<int> UITheme::getHomeCoverThumbHeights() const {
+  std::vector<int> heights;
+  auto addHeight = [&heights](int height) {
+    if (height > 0 && std::find(heights.begin(), heights.end(), height) == heights.end()) {
+      heights.push_back(height);
+    }
+  };
+
+  addHeight(currentMetrics->homeCoverHeight);
+  if (currentSdHomeRecents.type == ThemeHomeRecentsType::CoverStrip) {
+    for (const auto& slot : currentSdHomeRecents.slots) {
+      addHeight(slot.height);
+    }
+  }
+  return heights;
+}
 
 void UITheme::reload() {
   if (SETTINGS.sdThemeName[0] != '\0') {
@@ -60,6 +78,7 @@ void UITheme::setTheme(CrossPointSettings::UI_THEME type) {
   if (type == CrossPointSettings::UI_THEME::CLASSIC) {
     type = CrossPointSettings::UI_THEME::LYRA;
   }
+  currentSdHomeRecents = ThemeHomeRecentsSpec{};
 
   switch (type) {
     case CrossPointSettings::UI_THEME::LYRA:

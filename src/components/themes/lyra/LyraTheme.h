@@ -122,5 +122,6 @@ class LyraTheme : public BaseTheme {
   bool hasThemeIcon(UIIcon icon) const;
   bool drawThemeIcon(const GfxRenderer& renderer, UIIcon icon, int x, int y, int size) const;
   void drawCoverStripRecents(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,
-                             int selectorIndex, bool& coverRendered, bool& coverBufferStored) const;
+                             int selectorIndex, bool& coverRendered, bool& coverBufferStored, bool bufferRestored,
+                             std::function<bool()> storeCoverBuffer) const;
 };

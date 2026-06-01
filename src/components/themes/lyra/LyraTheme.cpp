@@ -659,8 +659,8 @@ void LyraTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
                                     const int selectorIndex, bool& coverRendered, bool& coverBufferStored,
                                     bool& bufferRestored, std::function<bool()> storeCoverBuffer) const {
   if (homeRecents_ != nullptr && homeRecents_->type == ThemeHomeRecentsType::CoverStrip) {
-    drawCoverStripRecents(renderer, rect, recentBooks, selectorIndex, coverRendered, coverBufferStored);
-    bufferRestored = false;
+    drawCoverStripRecents(renderer, rect, recentBooks, selectorIndex, coverRendered, coverBufferStored, bufferRestored,
+                          storeCoverBuffer);
     return;
   }
   if (homeRecents_ != nullptr && homeRecents_->type == ThemeHomeRecentsType::None) {
@@ -765,14 +765,23 @@ void LyraTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
 
 void LyraTheme::drawCoverStripRecents(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,
                                       const int selectorIndex, bool& coverRendered,
-                                      bool& coverBufferStored) const {
+                                      bool& coverBufferStored, bool bufferRestored,
+                                      std::function<bool()> storeCoverBuffer) const {
+  if (bufferRestored && coverRendered) {
+    return;
+  }
+
   if (recentBooks.empty()) {
     drawEmptyRecents(renderer, rect);
+    coverBufferStored = false;
+    coverRendered = false;
     return;
   }
 
   const ThemeHomeRecentsSpec& spec = *homeRecents_;
   if (spec.slots.empty()) {
+    coverBufferStored = false;
+    coverRendered = false;
     return;
   }
 
@@ -874,8 +883,8 @@ void LyraTheme::drawCoverStripRecents(GfxRenderer& renderer, Rect rect, const st
     }
   }
 
-  coverBufferStored = false;
-  coverRendered = false;
+  coverBufferStored = storeCoverBuffer();
+  coverRendered = coverBufferStored;
 }
 
 void LyraTheme::drawEmptyRecents(const GfxRenderer& renderer, const Rect rect) const {

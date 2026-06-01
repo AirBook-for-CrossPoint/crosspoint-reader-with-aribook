@@ -4,6 +4,7 @@
 
 #include <functional>
 #include <memory>
+#include <vector>
 
 #include "CrossPointSettings.h"
 #include "components/themes/SdCardThemeRegistry.h"
@@ -19,6 +20,7 @@ class UITheme {
 
   const ThemeMetrics& getMetrics() const { return *currentMetrics; }
   const BaseTheme& getTheme() const { return *currentTheme; }
+  std::vector<int> getHomeCoverThumbHeights() const;
   SdCardThemeRegistry& registry() { return themeRegistry; }
   void refreshRegistry();
   Rect getScreenSafeArea(const GfxRenderer& renderer, bool hasFrontButtonHints = false,
