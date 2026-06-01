@@ -194,7 +194,7 @@ void ActivityManager::goToBrowser() {
 }
 
 void ActivityManager::goToReader(std::string path) {
-  UITheme::getInstance().releaseSdThemeDownloadMemory();
+  UITheme::getInstance().releaseSdThemeAssetMemory();
   replaceActivity(std::make_unique<ReaderActivity>(renderer, mappedInput, std::move(path)));
 }
 

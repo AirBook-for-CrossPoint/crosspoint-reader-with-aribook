@@ -447,10 +447,12 @@ bool SdCardThemeRegistry::parseThemeJson(const char* themeDirPath, SdCardThemeIn
   parseTabBarSpec(deviceObj["components"]["tabBar"].as<JsonObjectConst>(), out.tabBar);
   parseHeaderSpec(doc["components"]["header"].as<JsonObjectConst>(), out.header);
   parseHeaderSpec(deviceObj["components"]["header"].as<JsonObjectConst>(), out.header);
-  parseIconMap(doc["assets"]["icons"].as<JsonObjectConst>(), out.icons);
-  parseIconMap(deviceObj["assets"]["icons"].as<JsonObjectConst>(), out.icons);
   applyMetricOverrides(doc["metrics"].as<JsonObjectConst>(), out.metrics);
   applyMetricOverrides(deviceObj["metrics"].as<JsonObjectConst>(), out.metrics);
+  if ((out.buttonMenu.enabled && out.buttonMenu.showIcons) || (out.list.enabled && out.list.showIcons)) {
+    parseIconMap(doc["assets"]["icons"].as<JsonObjectConst>(), out.icons);
+    parseIconMap(deviceObj["assets"]["icons"].as<JsonObjectConst>(), out.icons);
+  }
   if (out.homeRecents.type == ThemeHomeRecentsType::CoverStrip) {
     out.metrics.homeRecentBooksCount = std::max(1, out.homeRecents.maxBooks);
   } else if (out.homeRecents.type == ThemeHomeRecentsType::None) {

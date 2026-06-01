@@ -230,103 +230,13 @@
       "description": "A rounded, high-contrast theme with pill menus, rounded list rows, and grouped button hints.",
       "files": [
         {
-          "path": "icons/book.bmp",
-          "url": "roundedraff/icons/book.bmp",
-          "size": 190,
-          "crc32": 2024654237
-        },
-        {
-          "path": "icons/book24.bmp",
-          "url": "roundedraff/icons/book24.bmp",
-          "size": 158,
-          "crc32": 3979654830
-        },
-        {
-          "path": "icons/bookmark.bmp",
-          "url": "roundedraff/icons/bookmark.bmp",
-          "size": 190,
-          "crc32": 2661833068
-        },
-        {
-          "path": "icons/cover.bmp",
-          "url": "roundedraff/icons/cover.bmp",
-          "size": 190,
-          "crc32": 4277343188
-        },
-        {
-          "path": "icons/file24.bmp",
-          "url": "roundedraff/icons/file24.bmp",
-          "size": 158,
-          "crc32": 2617288513
-        },
-        {
-          "path": "icons/folder.bmp",
-          "url": "roundedraff/icons/folder.bmp",
-          "size": 190,
-          "crc32": 2058771447
-        },
-        {
-          "path": "icons/folder24.bmp",
-          "url": "roundedraff/icons/folder24.bmp",
-          "size": 158,
-          "crc32": 3210810266
-        },
-        {
-          "path": "icons/hotspot.bmp",
-          "url": "roundedraff/icons/hotspot.bmp",
-          "size": 190,
-          "crc32": 1094047065
-        },
-        {
-          "path": "icons/image24.bmp",
-          "url": "roundedraff/icons/image24.bmp",
-          "size": 158,
-          "crc32": 4245831462
-        },
-        {
-          "path": "icons/library.bmp",
-          "url": "roundedraff/icons/library.bmp",
-          "size": 190,
-          "crc32": 3825893573
-        },
-        {
-          "path": "icons/recent.bmp",
-          "url": "roundedraff/icons/recent.bmp",
-          "size": 190,
-          "crc32": 1431260786
-        },
-        {
-          "path": "icons/settings2.bmp",
-          "url": "roundedraff/icons/settings2.bmp",
-          "size": 190,
-          "crc32": 2285623569
-        },
-        {
-          "path": "icons/text24.bmp",
-          "url": "roundedraff/icons/text24.bmp",
-          "size": 158,
-          "crc32": 2842394777
-        },
-        {
-          "path": "icons/transfer.bmp",
-          "url": "roundedraff/icons/transfer.bmp",
-          "size": 190,
-          "crc32": 3478276151
-        },
-        {
-          "path": "icons/wifi.bmp",
-          "url": "roundedraff/icons/wifi.bmp",
-          "size": 190,
-          "crc32": 2222207198
-        },
-        {
           "path": "theme.json",
           "url": "roundedraff/theme.json",
-          "size": 5656,
-          "crc32": 2612375906
+          "size": 5064,
+          "crc32": 2087018682
         }
       ],
-      "totalSize": 8346
+      "totalSize": 5064
     },
     {
       "id": "super-minimal",
@@ -334,103 +244,13 @@
       "description": "A quiet text-only theme with no cover area, centered home options, underline selection, and icon-only hints.",
       "files": [
         {
-          "path": "icons/book.bmp",
-          "url": "super-minimal/icons/book.bmp",
-          "size": 190,
-          "crc32": 2024654237
-        },
-        {
-          "path": "icons/book24.bmp",
-          "url": "super-minimal/icons/book24.bmp",
-          "size": 158,
-          "crc32": 3979654830
-        },
-        {
-          "path": "icons/bookmark.bmp",
-          "url": "super-minimal/icons/bookmark.bmp",
-          "size": 190,
-          "crc32": 2661833068
-        },
-        {
-          "path": "icons/cover.bmp",
-          "url": "super-minimal/icons/cover.bmp",
-          "size": 190,
-          "crc32": 4277343188
-        },
-        {
-          "path": "icons/file24.bmp",
-          "url": "super-minimal/icons/file24.bmp",
-          "size": 158,
-          "crc32": 2617288513
-        },
-        {
-          "path": "icons/folder.bmp",
-          "url": "super-minimal/icons/folder.bmp",
-          "size": 190,
-          "crc32": 2058771447
-        },
-        {
-          "path": "icons/folder24.bmp",
-          "url": "super-minimal/icons/folder24.bmp",
-          "size": 158,
-          "crc32": 3210810266
-        },
-        {
-          "path": "icons/hotspot.bmp",
-          "url": "super-minimal/icons/hotspot.bmp",
-          "size": 190,
-          "crc32": 1094047065
-        },
-        {
-          "path": "icons/image24.bmp",
-          "url": "super-minimal/icons/image24.bmp",
-          "size": 158,
-          "crc32": 4245831462
-        },
-        {
-          "path": "icons/library.bmp",
-          "url": "super-minimal/icons/library.bmp",
-          "size": 190,
-          "crc32": 3825893573
-        },
-        {
-          "path": "icons/recent.bmp",
-          "url": "super-minimal/icons/recent.bmp",
-          "size": 190,
-          "crc32": 1431260786
-        },
-        {
-          "path": "icons/settings2.bmp",
-          "url": "super-minimal/icons/settings2.bmp",
-          "size": 190,
-          "crc32": 2285623569
-        },
-        {
-          "path": "icons/text24.bmp",
-          "url": "super-minimal/icons/text24.bmp",
-          "size": 158,
-          "crc32": 2842394777
-        },
-        {
-          "path": "icons/transfer.bmp",
-          "url": "super-minimal/icons/transfer.bmp",
-          "size": 190,
-          "crc32": 3478276151
-        },
-        {
-          "path": "icons/wifi.bmp",
-          "url": "super-minimal/icons/wifi.bmp",
-          "size": 190,
-          "crc32": 2222207198
-        },
-        {
           "path": "theme.json",
           "url": "super-minimal/theme.json",
           "size": 2541,
           "crc32": 2904465161
         }
       ],
-      "totalSize": 5231
+      "totalSize": 2541
     }
   ]
 }

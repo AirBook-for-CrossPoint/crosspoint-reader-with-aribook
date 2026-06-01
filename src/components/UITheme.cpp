@@ -21,13 +21,14 @@ UITheme::UITheme() {
 
 void UITheme::refreshRegistry() { themeRegistry.discover(); }
 
-void UITheme::releaseSdThemeDownloadMemory() {
+void UITheme::releaseSdThemeAssetMemory() {
   themeRegistry.clear();
   currentSdIcons.clear();
 }
 
 std::vector<int> UITheme::getHomeCoverThumbHeights() const {
   std::vector<int> heights;
+  heights.reserve(1 + currentSdHomeRecents.slots.size());
   auto addHeight = [&heights](int height) {
     if (height > 0 && std::find(heights.begin(), heights.end(), height) == heights.end()) {
       heights.push_back(height);
@@ -99,7 +100,16 @@ void UITheme::setTheme(CrossPointSettings::UI_THEME type) {
   if (type == CrossPointSettings::UI_THEME::CLASSIC) {
     type = CrossPointSettings::UI_THEME::LYRA;
   }
+  currentSdMetrics = ThemeMetrics{};
   currentSdHomeRecents = ThemeHomeRecentsSpec{};
+  currentSdButtonMenu = ThemeButtonMenuSpec{};
+  currentSdList = ThemeListSpec{};
+  currentSdButtonHints = ThemeButtonHintsSpec{};
+  currentSdTabBar = ThemeTabBarSpec{};
+  currentSdHeader = ThemeHeaderSpec{};
+  currentSdThemePath.clear();
+  currentSdIcons.clear();
+  themeRegistry.clear();
 
   switch (type) {
     case CrossPointSettings::UI_THEME::LYRA:

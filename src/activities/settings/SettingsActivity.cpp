@@ -278,7 +278,7 @@ void SettingsActivity::toggleCurrentSetting() {
         break;
       case SettingAction::DownloadFonts:
         releaseSettingsLists();
-        UITheme::getInstance().releaseSdThemeDownloadMemory();
+        UITheme::getInstance().releaseSdThemeAssetMemory();
         startActivityForResult(std::make_unique<FontDownloadActivity>(renderer, mappedInput),
                                [this](const ActivityResult&) {
                                  SETTINGS.saveToFile();
@@ -288,7 +288,7 @@ void SettingsActivity::toggleCurrentSetting() {
         break;
       case SettingAction::DownloadThemes:
         releaseSettingsLists();
-        UITheme::getInstance().releaseSdThemeDownloadMemory();
+        UITheme::getInstance().releaseSdThemeAssetMemory();
         startActivityForResult(std::make_unique<ThemeDownloadActivity>(renderer, mappedInput),
                                [this](const ActivityResult&) {
                                  SETTINGS.saveToFile();

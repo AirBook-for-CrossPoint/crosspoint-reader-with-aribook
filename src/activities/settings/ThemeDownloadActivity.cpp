@@ -126,7 +126,9 @@ bool ThemeDownloadActivity::fetchAndParseManifest() {
       return false;
     }
 
-    for (JsonObject fileObj : tObj["files"].as<JsonArray>()) {
+    JsonArray filesArr = tObj["files"].as<JsonArray>();
+    theme.files.reserve(filesArr.size());
+    for (JsonObject fileObj : filesArr) {
       ManifestFile file;
       file.path = fileObj["path"] | fileObj["name"] | "";
       file.url = fileObj["url"] | file.path;
@@ -163,6 +165,7 @@ bool ThemeDownloadActivity::fetchAndParseManifest() {
 
     themes_.push_back(std::move(theme));
   }
+  UITheme::getInstance().registry().clear();
 
   LOG_DBG("THEME", "Manifest loaded: %zu themes", themes_.size());
   return true;
@@ -332,7 +335,6 @@ void ThemeDownloadActivity::downloadTheme(ManifestTheme& theme) {
     currentFileIndex_++;
   }
 
-  themeInstaller_.refreshRegistry();
   theme.installed = true;
   theme.hasUpdate = false;
   RenderLock lock(*this);
@@ -360,7 +362,6 @@ void ThemeDownloadActivity::onDeleteConfirmationResult(const ActivityResult& res
     state_ = ERROR;
     errorMessage_ = "Failed to delete theme";
   } else {
-    themeInstaller_.refreshRegistry();
     theme.installed = false;
     theme.hasUpdate = false;
   }

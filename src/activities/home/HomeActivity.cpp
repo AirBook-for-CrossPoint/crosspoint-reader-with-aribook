@@ -6,6 +6,7 @@
 #include <GfxRenderer.h>
 #include <HalStorage.h>
 #include <I18n.h>
+#include <Memory.h>
 #include <Utf8.h>
 #include <Xtc.h>
 
@@ -59,15 +60,16 @@ void HomeActivity::loadRecentCovers(const std::vector<int>& coverHeights) {
   int progress = 0;
   for (RecentBook& book : recentBooks) {
     if (!book.coverBmpPath.empty()) {
-      std::vector<int> missingHeights;
+      bool hasMissingThumb = false;
       for (const int coverHeight : coverHeights) {
         std::string coverPath = UITheme::getCoverThumbPath(book.coverBmpPath, coverHeight);
         if (!Storage.exists(coverPath.c_str())) {
-          missingHeights.push_back(coverHeight);
+          hasMissingThumb = true;
+          break;
         }
       }
 
-      if (!missingHeights.empty()) {
+      if (hasMissingThumb) {
         // If epub, try to load the metadata for title/author and cover
         if (FsHelpers::hasEpubExtension(book.path)) {
           Epub epub(book.path, "/.crosspoint");
@@ -81,8 +83,11 @@ void HomeActivity::loadRecentCovers(const std::vector<int>& coverHeights) {
           }
           GUI.fillPopupProgress(renderer, popupRect, 10 + progress * (90 / recentBooks.size()));
           bool success = true;
-          for (const int coverHeight : missingHeights) {
-            success = epub.generateThumbBmp(coverHeight) && success;
+          for (const int coverHeight : coverHeights) {
+            std::string coverPath = UITheme::getCoverThumbPath(book.coverBmpPath, coverHeight);
+            if (!Storage.exists(coverPath.c_str())) {
+              success = epub.generateThumbBmp(coverHeight) && success;
+            }
           }
           if (!success) {
             RECENT_BOOKS.updateBook(book.path, book.title, book.author, "");
@@ -101,8 +106,11 @@ void HomeActivity::loadRecentCovers(const std::vector<int>& coverHeights) {
             }
             GUI.fillPopupProgress(renderer, popupRect, 10 + progress * (90 / recentBooks.size()));
             bool success = true;
-            for (const int coverHeight : missingHeights) {
-              success = xtc.generateThumbBmp(coverHeight) && success;
+            for (const int coverHeight : coverHeights) {
+              std::string coverPath = UITheme::getCoverThumbPath(book.coverBmpPath, coverHeight);
+              if (!Storage.exists(coverPath.c_str())) {
+                success = xtc.generateThumbBmp(coverHeight) && success;
+              }
             }
             if (!success) {
               RECENT_BOOKS.updateBook(book.path, book.title, book.author, "");
@@ -153,15 +161,14 @@ bool HomeActivity::storeCoverBuffer() {
   freeCoverBuffer();
   const size_t needed = renderer.getRegionByteSize(coverRectX, coverRectY, coverRectW, coverRectH);
   if (needed == 0) return false;
-  coverBuffer = static_cast<uint8_t*>(malloc(needed));
+  coverBuffer = makeUniqueNoThrow<uint8_t[]>(needed);
   if (!coverBuffer) {
     LOG_ERR("HOME", "OOM: cover buffer (%u bytes)", (unsigned)needed);
     return false;
   }
   coverBufferSize = needed;
-  if (!renderer.copyRegionToBuffer(coverRectX, coverRectY, coverRectW, coverRectH, coverBuffer, coverBufferSize)) {
-    free(coverBuffer);
-    coverBuffer = nullptr;
+  if (!renderer.copyRegionToBuffer(coverRectX, coverRectY, coverRectW, coverRectH, coverBuffer.get(), coverBufferSize)) {
+    coverBuffer.reset();
     coverBufferSize = 0;
     return false;
   }
@@ -172,14 +179,11 @@ bool HomeActivity::storeCoverBuffer() {
 
 bool HomeActivity::restoreCoverBuffer() {
   if (!coverBuffer || coverRectW <= 0 || coverRectH <= 0) return false;
-  return renderer.copyBufferToRegion(coverRectX, coverRectY, coverRectW, coverRectH, coverBuffer, coverBufferSize);
+  return renderer.copyBufferToRegion(coverRectX, coverRectY, coverRectW, coverRectH, coverBuffer.get(), coverBufferSize);
 }
 
 void HomeActivity::freeCoverBuffer() {
-  if (coverBuffer) {
-    free(coverBuffer);
-    coverBuffer = nullptr;
-  }
+  coverBuffer.reset();
   coverBufferSize = 0;
   coverBufferStored = false;
   coverBufferSelectorIndex = -1;
