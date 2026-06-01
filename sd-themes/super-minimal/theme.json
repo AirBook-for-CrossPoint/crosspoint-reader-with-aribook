@@ -38,9 +38,11 @@
       "buttonWidth": 80,
       "smallButtonHeight": 15,
       "cornerRadius": 6,
-      "fill": true,
-      "outline": true,
-      "drawEmpty": true,
+      "fill": false,
+      "outline": false,
+      "drawEmpty": false,
+      "shapes": true,
+      "shapeSize": 18,
       "textOffsetY": 7
     }
   },

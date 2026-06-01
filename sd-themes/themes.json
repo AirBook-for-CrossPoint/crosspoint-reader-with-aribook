@@ -412,11 +412,11 @@
         {
           "path": "theme.json",
           "url": "super-minimal/theme.json",
-          "size": 1592,
-          "crc32": 3211671109
+          "size": 1640,
+          "crc32": 3212266381
         }
       ],
-      "totalSize": 4282
+      "totalSize": 4330
     }
   ]
 }

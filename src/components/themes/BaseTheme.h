@@ -182,6 +182,8 @@ struct ThemeButtonHintsSpec {
   bool fill = true;
   bool outline = true;
   bool drawEmpty = true;
+  bool shapes = false;
+  int shapeSize = 18;
   int textOffsetY = 7;
 };
 

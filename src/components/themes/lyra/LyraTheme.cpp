@@ -85,6 +85,92 @@ const uint8_t* iconForName(UIIcon icon, int size) {
   }
   return nullptr;
 }
+
+enum class ButtonHintShape { None, Back, Select, Up, Down, Left, Right };
+
+bool matchesLabel(const char* label, const char* expected) {
+  return label != nullptr && expected != nullptr && strcmp(label, expected) == 0;
+}
+
+ButtonHintShape shapeForButtonHintLabel(const char* label) {
+  if (label == nullptr || label[0] == '\0') return ButtonHintShape::None;
+  if (matchesLabel(label, tr(STR_BACK)) || matchesLabel(label, tr(STR_CANCEL)) ||
+      matchesLabel(label, tr(STR_HOME))) {
+    return ButtonHintShape::Back;
+  }
+  if (matchesLabel(label, tr(STR_SELECT)) || matchesLabel(label, tr(STR_CONFIRM)) ||
+      matchesLabel(label, tr(STR_OK_BUTTON)) || matchesLabel(label, tr(STR_DONE)) ||
+      matchesLabel(label, tr(STR_OPEN))) {
+    return ButtonHintShape::Select;
+  }
+  if (matchesLabel(label, tr(STR_DIR_UP))) return ButtonHintShape::Up;
+  if (matchesLabel(label, tr(STR_DIR_DOWN))) return ButtonHintShape::Down;
+  if (matchesLabel(label, tr(STR_DIR_LEFT)) || strcmp(label, "<") == 0 || strcmp(label, "-") == 0) {
+    return ButtonHintShape::Left;
+  }
+  if (matchesLabel(label, tr(STR_DIR_RIGHT)) || strcmp(label, ">") == 0 || strcmp(label, "+") == 0) {
+    return ButtonHintShape::Right;
+  }
+  return ButtonHintShape::None;
+}
+
+void fillCircle(const GfxRenderer& renderer, int cx, int cy, int radius) {
+  const int r2 = radius * radius;
+  for (int y = -radius; y <= radius; ++y) {
+    for (int x = -radius; x <= radius; ++x) {
+      if (x * x + y * y <= r2) renderer.drawPixel(cx + x, cy + y, true);
+    }
+  }
+}
+
+void drawButtonHintShape(const GfxRenderer& renderer, ButtonHintShape shape, int centerX, int centerY, int size) {
+  const int half = std::max(4, size / 2);
+  if (shape == ButtonHintShape::Back) {
+    renderer.fillRect(centerX - half, centerY - half, half * 2, half * 2, true);
+  } else if (shape == ButtonHintShape::Select) {
+    fillCircle(renderer, centerX, centerY, half);
+  } else if (shape != ButtonHintShape::None) {
+    int xPoints[3] = {};
+    int yPoints[3] = {};
+    switch (shape) {
+      case ButtonHintShape::Up:
+        xPoints[0] = centerX;
+        yPoints[0] = centerY - half;
+        xPoints[1] = centerX - half;
+        yPoints[1] = centerY + half;
+        xPoints[2] = centerX + half;
+        yPoints[2] = centerY + half;
+        break;
+      case ButtonHintShape::Down:
+        xPoints[0] = centerX - half;
+        yPoints[0] = centerY - half;
+        xPoints[1] = centerX + half;
+        yPoints[1] = centerY - half;
+        xPoints[2] = centerX;
+        yPoints[2] = centerY + half;
+        break;
+      case ButtonHintShape::Left:
+        xPoints[0] = centerX - half;
+        yPoints[0] = centerY;
+        xPoints[1] = centerX + half;
+        yPoints[1] = centerY - half;
+        xPoints[2] = centerX + half;
+        yPoints[2] = centerY + half;
+        break;
+      case ButtonHintShape::Right:
+        xPoints[0] = centerX - half;
+        yPoints[0] = centerY - half;
+        xPoints[1] = centerX + half;
+        yPoints[1] = centerY;
+        xPoints[2] = centerX - half;
+        yPoints[2] = centerY + half;
+        break;
+      default:
+        return;
+    }
+    renderer.fillPolygon(xPoints, yPoints, 3, true);
+  }
+}
 }  // namespace
 
 bool LyraTheme::hasThemeIcon(UIIcon icon) const {
@@ -470,6 +556,8 @@ void LyraTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
   const int fontId = buttonHints_ != nullptr && buttonHints_->enabled ? buttonHints_->fontId : SMALL_FONT_ID;
   const auto style = buttonHints_ != nullptr && buttonHints_->enabled && buttonHints_->bold ? EpdFontFamily::BOLD
                                                                                            : EpdFontFamily::REGULAR;
+  const bool shapes = buttonHints_ != nullptr && buttonHints_->enabled && buttonHints_->shapes;
+  const int shapeSize = buttonHints_ != nullptr && buttonHints_->enabled ? buttonHints_->shapeSize : 18;
   // X3 has wider screen in portrait (528 vs 480), use more spacing
   constexpr int x4ButtonPositions[] = {58, 146, 254, 342};
   constexpr int x3ButtonPositions[] = {65, 157, 291, 383};
@@ -479,6 +567,11 @@ void LyraTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
   for (int i = 0; i < 4; i++) {
     const int x = buttonPositions[i];
     if (labels[i] != nullptr && labels[i][0] != '\0') {
+      if (shapes) {
+        drawButtonHintShape(renderer, shapeForButtonHintLabel(labels[i]), x + buttonWidth / 2,
+                            pageHeight - buttonY + buttonHeight / 2, shapeSize);
+        continue;
+      }
       if (buttonHints_ == nullptr || !buttonHints_->enabled || buttonHints_->fill) {
         renderer.fillRoundedRect(x, pageHeight - buttonY, buttonWidth, buttonHeight, buttonCornerRadius, Color::White);
       }
@@ -755,10 +848,12 @@ void LyraTheme::drawCoverStripRecents(GfxRenderer& renderer, Rect rect, const st
     y += slot.yOffset;
 
     const bool selectedCover = slot.selected && (slot.book != ThemeBookRef::Index || bookIndex == selected);
+    LOG_DBG("THEME", "Cover slot book=%d xMode=%d yMode=%d rect=%d,%d %dx%d selected=%d", bookIndex,
+            static_cast<int>(slot.x), static_cast<int>(slot.y), x, y, w, h, selectedCover);
     drawCover(bookIndex, x, y, w, h, selectedCover);
 
     if (slot.title.enabled) {
-      const int maxWidth = std::max(40, rect.width - 2 * m.contentSidePadding);
+      const int maxWidth = std::max(40, w + 28);
       const auto style = slot.title.bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR;
       const auto titleLines =
           renderer.wrappedText(slot.title.fontId, recentBooks[bookIndex].title.c_str(), maxWidth, slot.title.maxLines,
@@ -766,7 +861,7 @@ void LyraTheme::drawCoverStripRecents(GfxRenderer& renderer, Rect rect, const st
       int titleY = y + h + slot.title.offsetY;
       for (const auto& line : titleLines) {
         const int textWidth = renderer.getTextWidth(slot.title.fontId, line.c_str(), style);
-        renderer.drawText(slot.title.fontId, rect.x + (rect.width - textWidth) / 2, titleY, line.c_str(), true, style);
+        renderer.drawText(slot.title.fontId, x + (w - textWidth) / 2, titleY, line.c_str(), true, style);
         titleY += renderer.getLineHeight(slot.title.fontId);
       }
     }

@@ -267,6 +267,8 @@ void parseButtonHintsSpec(JsonObjectConst obj, ThemeButtonHintsSpec& spec) {
   spec.fill = obj["fill"] | spec.fill;
   spec.outline = obj["outline"] | spec.outline;
   spec.drawEmpty = obj["drawEmpty"] | spec.drawEmpty;
+  spec.shapes = obj["shapes"] | spec.shapes;
+  spec.shapeSize = obj["shapeSize"] | spec.shapeSize;
   spec.textOffsetY = obj["textOffsetY"] | spec.textOffsetY;
   if (spec.fontId == 0) spec.fontId = SMALL_FONT_ID;
 }
