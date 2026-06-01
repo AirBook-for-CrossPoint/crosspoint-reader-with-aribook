@@ -1,0 +1,158 @@
+{
+  "schema": 1,
+  "id": "classic",
+  "name": "Classic",
+  "description": "Original CrossPoint classic UI rebuilt as an SD theme.",
+  "inherits": "lyra",
+  "metrics": {
+    "batteryWidth": 15,
+    "batteryHeight": 12,
+    "topPadding": 5,
+    "batteryBarHeight": 20,
+    "headerHeight": 45,
+    "verticalSpacing": 10,
+    "contentSidePadding": 20,
+    "listRowHeight": 30,
+    "listWithSubtitleRowHeight": 50,
+    "menuRowHeight": 45,
+    "menuSpacing": 8,
+    "tabSpacing": 10,
+    "tabBarHeight": 50,
+    "scrollBarWidth": 4,
+    "scrollBarRightOffset": 5,
+    "homeTopPadding": 40,
+    "homeCoverHeight": 400,
+    "homeCoverTileHeight": 400,
+    "homeRecentBooksCount": 1,
+    "homeContinueReadingInMenu": false,
+    "homeShowContinueReadingHeader": true,
+    "homeMenuTopOffset": 10,
+    "buttonHintsHeight": 40,
+    "sideButtonHintsWidth": 30,
+    "progressBarHeight": 16,
+    "progressBarMarginTop": 1,
+    "statusBarHorizontalMargin": 5,
+    "statusBarVerticalMargin": 19,
+    "keyboardKeyWidth": 22,
+    "keyboardKeyHeight": 40,
+    "keyboardKeySpacing": 0,
+    "keyboardBottomKeyHeight": 35,
+    "keyboardBottomKeySpacing": 5,
+    "keyboardBottomAligned": true,
+    "keyboardCenteredText": false,
+    "keyboardVerticalOffset": -13,
+    "keyboardTextFieldWidthPercent": 85,
+    "keyboardWidthPercent": 90,
+    "keyboardKeyCornerRadius": 0,
+    "keyboardFillUnselected": false,
+    "keyboardOutlineAllUnselected": false,
+    "keyboardDrawSpecialOutlineWhenUnselected": true,
+    "keyboardSecondaryLabelRightPadding": 1,
+    "keyboardSecondaryLabelTopPadding": 0,
+    "keyboardMinArrowHeadSize": 0,
+    "popupTopOffsetRatio": 0.075,
+    "popupMarginX": 15,
+    "popupMarginY": 15,
+    "popupFrameThickness": 2,
+    "popupCornerRadius": 0,
+    "popupTextBold": true,
+    "popupTextInverted": true,
+    "popupProgressBarHeight": 4,
+    "popupProgressDrawOutline": false,
+    "popupProgressClampPercent": false,
+    "popupProgressFillInverted": true,
+    "popupProgressOutlineInverted": true
+  },
+  "components": {
+    "homeRecents": {
+      "type": "cover-strip",
+      "maxBooks": 1,
+      "wrap": false,
+      "selectionLineWidth": 3,
+      "selectionCornerRadius": 0,
+      "slots": [
+        {
+          "book": "selected",
+          "x": "center",
+          "y": "top",
+          "height": 400,
+          "widthPercent": 50,
+          "selected": true,
+          "title": {
+            "enabled": true,
+            "font": "ui12",
+            "style": "regular",
+            "maxLines": 3,
+            "offsetY": 10
+          }
+        }
+      ]
+    },
+    "homeMenu": {
+      "font": "ui10",
+      "style": "regular",
+      "centeredText": true,
+      "showIcons": false,
+      "drawPanel": false,
+      "selectionStyle": "fill",
+      "selectionCornerRadius": 0,
+      "selectionInset": 20,
+      "selectedTextInverted": true,
+      "selectionFillBlack": true
+    },
+    "list": {
+      "font": "ui10",
+      "style": "regular",
+      "subtitleFontId": 0,
+      "showIcons": false,
+      "selectionCornerRadius": 0,
+      "selectionFill": true,
+      "selectionOutline": false,
+      "selectedTextInverted": true,
+      "rowBackgrounds": true,
+      "rowSidePadding": 0,
+      "textInsetX": 20,
+      "titleOffsetY": 0,
+      "subtitleOffsetY": 22,
+      "valueOffsetY": 0,
+      "subtitleValueOffsetY": 10
+    },
+    "buttonHints": {
+      "font": "small",
+      "style": "regular",
+      "buttonWidth": 80,
+      "smallButtonHeight": 15,
+      "cornerRadius": 0,
+      "fill": true,
+      "outline": true,
+      "drawEmpty": true,
+      "textOffsetY": 7
+    },
+    "tabBar": {
+      "font": "ui12",
+      "style": "regular",
+      "equalWidth": false,
+      "selectedCornerRadius": 0,
+      "selectedTextInverted": true,
+      "drawDivider": false
+    }
+  },
+  "devices": {
+    "x3": {
+      "constraints": {
+        "screenWidth": 480,
+        "screenHeight": 800,
+        "frontButtons": 4,
+        "sideButtons": "up-down"
+      }
+    },
+    "x4": {
+      "constraints": {
+        "screenWidth": 480,
+        "screenHeight": 800,
+        "frontButtons": 0,
+        "sideButtons": "up-down"
+      }
+    }
+  }
+}

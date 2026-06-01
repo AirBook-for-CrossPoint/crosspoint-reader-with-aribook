@@ -217,6 +217,8 @@ void parseButtonMenuSpec(JsonObjectConst obj, ThemeButtonMenuSpec& spec) {
   spec.panelCornerRadius = obj["panelCornerRadius"] | spec.panelCornerRadius;
   spec.selectionCornerRadius = obj["selectionCornerRadius"] | spec.selectionCornerRadius;
   spec.selectionInset = obj["selectionInset"] | spec.selectionInset;
+  spec.selectedTextInverted = obj["selectedTextInverted"] | spec.selectedTextInverted;
+  spec.selectionFillBlack = obj["selectionFillBlack"] | spec.selectionFillBlack;
 
   const char* selectionStyle = obj["selectionStyle"].as<const char*>();
   if (selectionStyle != nullptr) {
@@ -226,10 +228,14 @@ void parseButtonMenuSpec(JsonObjectConst obj, ThemeButtonMenuSpec& spec) {
       spec.selectionStyle = ThemeMenuSelectionStyle::Triangle;
     } else if (strcmp(selectionStyle, "underline") == 0) {
       spec.selectionStyle = ThemeMenuSelectionStyle::Underline;
+    } else if (strcmp(selectionStyle, "pill") == 0) {
+      spec.selectionStyle = ThemeMenuSelectionStyle::Pill;
     } else {
       spec.selectionStyle = ThemeMenuSelectionStyle::Fill;
     }
   }
+  spec.rowPaddingX = obj["rowPaddingX"] | spec.rowPaddingX;
+  spec.textInsetX = obj["textInsetX"] | spec.textInsetX;
 }
 
 void parseListSpec(JsonObjectConst obj, ThemeListSpec& spec) {
@@ -245,6 +251,9 @@ void parseListSpec(JsonObjectConst obj, ThemeListSpec& spec) {
   spec.selectionFill = obj["selectionFill"] | spec.selectionFill;
   spec.selectionOutline = obj["selectionOutline"] | spec.selectionOutline;
   spec.selectedTextInverted = obj["selectedTextInverted"] | spec.selectedTextInverted;
+  spec.rowBackgrounds = obj["rowBackgrounds"] | spec.rowBackgrounds;
+  spec.rowSidePadding = obj["rowSidePadding"] | spec.rowSidePadding;
+  spec.textInsetX = obj["textInsetX"] | spec.textInsetX;
   spec.selectionInsetX = obj["selectionInsetX"] | spec.selectionInsetX;
   spec.selectionInsetY = obj["selectionInsetY"] | spec.selectionInsetY;
   spec.titleOffsetY = obj["titleOffsetY"] | spec.titleOffsetY;
@@ -268,9 +277,55 @@ void parseButtonHintsSpec(JsonObjectConst obj, ThemeButtonHintsSpec& spec) {
   spec.outline = obj["outline"] | spec.outline;
   spec.drawEmpty = obj["drawEmpty"] | spec.drawEmpty;
   spec.shapes = obj["shapes"] | spec.shapes;
+  const char* hintLayout = obj["layout"].as<const char*>();
+  if (hintLayout != nullptr) {
+    if (strcmp(hintLayout, "shapes") == 0) {
+      spec.style = ThemeButtonHintsStyle::Shapes;
+      spec.shapes = true;
+    } else if (strcmp(hintLayout, "groups") == 0) {
+      spec.style = ThemeButtonHintsStyle::Groups;
+      spec.shapes = false;
+    } else {
+      spec.style = ThemeButtonHintsStyle::Buttons;
+    }
+  } else if (spec.shapes) {
+    spec.style = ThemeButtonHintsStyle::Shapes;
+  }
+  spec.sidePadding = obj["sidePadding"] | spec.sidePadding;
+  spec.groupGap = obj["groupGap"] | spec.groupGap;
+  spec.bottomMargin = obj["bottomMargin"] | spec.bottomMargin;
+  spec.innerPadding = obj["innerPadding"] | spec.innerPadding;
   spec.shapeSize = obj["shapeSize"] | spec.shapeSize;
   spec.textOffsetY = obj["textOffsetY"] | spec.textOffsetY;
   if (spec.fontId == 0) spec.fontId = SMALL_FONT_ID;
+}
+
+void parseTabBarSpec(JsonObjectConst obj, ThemeTabBarSpec& spec) {
+  if (obj.isNull()) return;
+  spec.enabled = true;
+  applyFontSpec(obj, spec.fontId, spec.bold);
+  spec.equalWidth = obj["equalWidth"] | spec.equalWidth;
+  const char* selectionStyle = obj["selectionStyle"].as<const char*>();
+  if (selectionStyle != nullptr) {
+    if (strcmp(selectionStyle, "underline") == 0) {
+      spec.selectionStyle = ThemeMenuSelectionStyle::Underline;
+    } else {
+      spec.selectionStyle = ThemeMenuSelectionStyle::Fill;
+    }
+  }
+  spec.selectedCornerRadius = obj["selectedCornerRadius"] | spec.selectedCornerRadius;
+  spec.selectedTextInverted = obj["selectedTextInverted"] | spec.selectedTextInverted;
+  spec.drawDivider = obj["drawDivider"] | spec.drawDivider;
+  spec.horizontalInset = obj["horizontalInset"] | spec.horizontalInset;
+}
+
+void parseHeaderSpec(JsonObjectConst obj, ThemeHeaderSpec& spec) {
+  if (obj.isNull()) return;
+  spec.enabled = true;
+  applyFontSpec(obj, spec.fontId, spec.bold);
+  spec.centeredTitle = obj["centeredTitle"] | spec.centeredTitle;
+  spec.showDivider = obj["showDivider"] | spec.showDivider;
+  spec.titleOffsetY = obj["titleOffsetY"] | spec.titleOffsetY;
 }
 
 bool iconForKey(const char* key, UIIcon& out) {
@@ -366,6 +421,10 @@ bool SdCardThemeRegistry::parseThemeJson(const char* themeDirPath, SdCardThemeIn
   parseListSpec(deviceObj["components"]["list"].as<JsonObjectConst>(), out.list);
   parseButtonHintsSpec(doc["components"]["buttonHints"].as<JsonObjectConst>(), out.buttonHints);
   parseButtonHintsSpec(deviceObj["components"]["buttonHints"].as<JsonObjectConst>(), out.buttonHints);
+  parseTabBarSpec(doc["components"]["tabBar"].as<JsonObjectConst>(), out.tabBar);
+  parseTabBarSpec(deviceObj["components"]["tabBar"].as<JsonObjectConst>(), out.tabBar);
+  parseHeaderSpec(doc["components"]["header"].as<JsonObjectConst>(), out.header);
+  parseHeaderSpec(deviceObj["components"]["header"].as<JsonObjectConst>(), out.header);
   parseIconMap(doc["assets"]["icons"].as<JsonObjectConst>(), out.icons);
   parseIconMap(deviceObj["assets"]["icons"].as<JsonObjectConst>(), out.icons);
   applyMetricOverrides(doc["metrics"].as<JsonObjectConst>(), out.metrics);

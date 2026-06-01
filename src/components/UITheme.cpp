@@ -58,6 +58,8 @@ void UITheme::reload() {
     currentSdButtonMenu = themeInfo->buttonMenu;
     currentSdList = themeInfo->list;
     currentSdButtonHints = themeInfo->buttonHints;
+    currentSdTabBar = themeInfo->tabBar;
+    currentSdHeader = themeInfo->header;
     currentSdThemePath = themeInfo->path;
     currentSdIcons = themeInfo->icons;
     const ThemeHomeRecentsSpec* homeRecents =
@@ -65,8 +67,10 @@ void UITheme::reload() {
     const ThemeButtonMenuSpec* buttonMenu = currentSdButtonMenu.enabled ? &currentSdButtonMenu : nullptr;
     const ThemeListSpec* list = currentSdList.enabled ? &currentSdList : nullptr;
     const ThemeButtonHintsSpec* buttonHints = currentSdButtonHints.enabled ? &currentSdButtonHints : nullptr;
-    currentTheme = std::make_unique<LyraTheme>(&currentSdMetrics, homeRecents, buttonMenu, list, buttonHints,
-                                               currentSdThemePath.c_str(), &currentSdIcons);
+    const ThemeTabBarSpec* tabBar = currentSdTabBar.enabled ? &currentSdTabBar : nullptr;
+    const ThemeHeaderSpec* header = currentSdHeader.enabled ? &currentSdHeader : nullptr;
+    currentTheme = std::make_unique<LyraTheme>(&currentSdMetrics, homeRecents, buttonMenu, list, buttonHints, tabBar,
+                                               header, currentSdThemePath.c_str(), &currentSdIcons);
     currentMetrics = &currentSdMetrics;
     return;
   }

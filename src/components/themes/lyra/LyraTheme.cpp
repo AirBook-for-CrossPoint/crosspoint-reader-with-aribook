@@ -226,6 +226,48 @@ void LyraTheme::fillBatteryIcon(const GfxRenderer& renderer, Rect rect, uint16_t
 }
 
 void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* title, const char* subtitle) const {
+  if (header_ != nullptr && header_->enabled) {
+    renderer.fillRect(rect.x, rect.y, rect.width, rect.height, false);
+
+    const bool showBatteryPercentage =
+        SETTINGS.hideBatteryPercentage != CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_ALWAYS;
+    const int batteryX = rect.x + rect.width - 12 - metrics().batteryWidth;
+    drawBatteryRight(renderer, Rect{batteryX, rect.y + 5, metrics().batteryWidth, metrics().batteryHeight},
+                     showBatteryPercentage);
+
+    const auto style = header_->bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR;
+    if (title != nullptr) {
+      const int reserveRight = rect.width - batteryX + metrics().batteryWidth + metrics().contentSidePadding;
+      const int maxTitleWidth = std::max(0, rect.width - reserveRight * 2);
+      const auto truncatedTitle = renderer.truncatedText(header_->fontId, title, maxTitleWidth, style);
+      const int lineHeight = renderer.getLineHeight(header_->fontId);
+      const int titleY =
+          rect.y + header_->titleOffsetY + std::max(0, (rect.height - lineHeight) / 2);
+      if (header_->centeredTitle) {
+        const int textWidth = renderer.getTextWidth(header_->fontId, truncatedTitle.c_str(), style);
+        renderer.drawText(header_->fontId, rect.x + (rect.width - textWidth) / 2, titleY, truncatedTitle.c_str(), true,
+                          style);
+      } else {
+        renderer.drawText(header_->fontId, rect.x + metrics().contentSidePadding, titleY, truncatedTitle.c_str(), true,
+                          style);
+      }
+    }
+
+    if (subtitle != nullptr && subtitle[0] != '\0') {
+      const auto truncatedSubtitle =
+          renderer.truncatedText(SMALL_FONT_ID, subtitle, rect.width - metrics().contentSidePadding * 2);
+      const int subtitleWidth = renderer.getTextWidth(SMALL_FONT_ID, truncatedSubtitle.c_str());
+      renderer.drawText(SMALL_FONT_ID, rect.x + rect.width - metrics().contentSidePadding - subtitleWidth,
+                        rect.y + rect.height - renderer.getLineHeight(SMALL_FONT_ID) - 4, truncatedSubtitle.c_str(),
+                        true);
+    }
+
+    if (header_->showDivider) {
+      renderer.drawLine(rect.x, rect.y + rect.height - 1, rect.x + rect.width - 1, rect.y + rect.height - 1, true);
+    }
+    return;
+  }
+
   renderer.fillRect(rect.x, rect.y, rect.width, rect.height, false);
 
   const bool showBatteryPercentage =
@@ -301,6 +343,39 @@ void LyraTheme::drawSubHeader(const GfxRenderer& renderer, Rect rect, const char
 
 void LyraTheme::drawTabBar(const GfxRenderer& renderer, Rect rect, const std::vector<TabInfo>& tabs,
                            bool selected) const {
+  if (tabBar_ != nullptr && tabBar_->enabled && tabBar_->equalWidth && !tabs.empty()) {
+    const int tabCount = static_cast<int>(tabs.size());
+    const int tabY = rect.y + 4;
+    const int tabHeight = rect.height - 12;
+    const auto style = tabBar_->bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR;
+    for (int i = 0; i < tabCount; ++i) {
+      const int slotX = rect.x + (i * rect.width) / tabCount;
+      const int nextSlotX = rect.x + ((i + 1) * rect.width) / tabCount;
+      const int slotWidth = nextSlotX - slotX;
+      const int inset = std::min(tabBar_->horizontalInset, slotWidth / 2);
+      const int tabX = slotX + inset;
+      const int tabWidth = std::max(0, slotWidth - inset * 2);
+      const auto& tab = tabs[i];
+      if (tab.selected && tabBar_->selectionStyle == ThemeMenuSelectionStyle::Fill) {
+        renderer.fillRoundedRect(tabX, tabY, tabWidth, tabHeight, tabBar_->selectedCornerRadius,
+                                 selected ? Color::Black : Color::LightGray);
+      }
+      const int textWidth = renderer.getTextWidth(tabBar_->fontId, tab.label, style);
+      const int textX = tabX + (tabWidth - textWidth) / 2;
+      const int textY = tabY + (tabHeight - renderer.getLineHeight(tabBar_->fontId)) / 2;
+      renderer.drawText(tabBar_->fontId, textX, textY, tab.label,
+                        !(tab.selected && selected && tabBar_->selectedTextInverted), style);
+      if (tab.selected && tabBar_->selectionStyle == ThemeMenuSelectionStyle::Underline) {
+        const int underlineY = std::min(rect.y + rect.height - 3, textY + renderer.getLineHeight(tabBar_->fontId) + 3);
+        renderer.drawLine(textX, underlineY, textX + textWidth - 1, underlineY, true);
+      }
+    }
+    if (tabBar_->drawDivider) {
+      renderer.drawLine(rect.x, rect.y + rect.height - 1, rect.x + rect.width - 1, rect.y + rect.height - 1, true);
+    }
+    return;
+  }
+
   int currentX = rect.x + metrics().contentSidePadding;
 
   if (selected) {
@@ -361,7 +436,7 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
                         true);
     }
 
-    if (selectedIndex >= 0) {
+    if (selectedIndex >= 0 && !spec.rowBackgrounds) {
       const int selectedY = rect.y + selectedIndex % pageItems * rowHeight;
       Rect selectionRect{rect.x + metrics().contentSidePadding + spec.selectionInsetX,
                          selectedY + spec.selectionInsetY,
@@ -377,8 +452,11 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
       }
     }
 
-    int textX = rect.x + metrics().contentSidePadding + hPaddingInSelection;
-    int textWidth = contentWidth - metrics().contentSidePadding * 2 - hPaddingInSelection * 2;
+    const int rowX = rect.x + spec.rowSidePadding;
+    const int rowWidth = contentWidth - spec.rowSidePadding * 2;
+    int textX = spec.rowBackgrounds ? rowX + spec.textInsetX : rect.x + metrics().contentSidePadding + hPaddingInSelection;
+    int textWidth = spec.rowBackgrounds ? rowWidth - spec.textInsetX * 2
+                                        : contentWidth - metrics().contentSidePadding * 2 - hPaddingInSelection * 2;
     const int iconSize = spec.iconSize > 0 ? spec.iconSize : ((rowSubtitle != nullptr) ? mainMenuIconSize : listIconSize);
     if (rowIcon != nullptr && spec.showIcons) {
       textX += iconSize + spec.textGap;
@@ -391,6 +469,10 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
       const int itemY = rect.y + (i % pageItems) * rowHeight;
       const bool selected = i == selectedIndex;
       int rowTextWidth = textWidth;
+      if (spec.rowBackgrounds) {
+        renderer.fillRoundedRect(rowX, itemY, rowWidth, rowHeight, spec.selectionCornerRadius,
+                                 selected ? Color::Black : Color::White);
+      }
 
       int valueWidth = 0;
       std::string valueText;
@@ -422,12 +504,12 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
             rowSubtitle != nullptr ? spec.subtitleOffsetY + renderer.getLineHeight(spec.subtitleFontId)
                                    : spec.titleOffsetY + titleLineHeight;
         const int iconY = itemY + (textBlockTop + textBlockBottom - iconSize) / 2 + spec.iconOffsetY;
-        if (!drawThemeIcon(renderer, icon, rect.x + metrics().contentSidePadding + hPaddingInSelection,
-                           iconY, iconSize)) {
+        const int iconX = spec.rowBackgrounds ? rowX + spec.textInsetX
+                                              : rect.x + metrics().contentSidePadding + hPaddingInSelection;
+        if (!drawThemeIcon(renderer, icon, iconX, iconY, iconSize)) {
           const uint8_t* iconBitmap = iconForName(icon, iconSize);
           if (iconBitmap != nullptr) {
-            renderer.drawIcon(iconBitmap, rect.x + metrics().contentSidePadding + hPaddingInSelection,
-                              iconY, iconSize, iconSize);
+            renderer.drawIcon(iconBitmap, iconX, iconY, iconSize, iconSize);
           }
         }
       }
@@ -440,13 +522,15 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
 
       if (!valueText.empty()) {
         if (selected && highlightValue) {
-          renderer.fillRoundedRect(
-              rect.x + contentWidth - metrics().contentSidePadding - hPaddingInSelection - valueWidth, itemY,
-              valueWidth + hPaddingInSelection, rowHeight, spec.selectionCornerRadius, Color::Black);
+          renderer.fillRoundedRect(rect.x + contentWidth - metrics().contentSidePadding - hPaddingInSelection - valueWidth,
+                                   itemY, valueWidth + hPaddingInSelection, rowHeight, spec.selectionCornerRadius,
+                                   Color::Black);
         }
         const int valueY = itemY + (rowSubtitle != nullptr ? spec.subtitleValueOffsetY : spec.valueOffsetY);
-        renderer.drawText(spec.valueFontId, rect.x + contentWidth - metrics().contentSidePadding - valueWidth, valueY,
-                          valueText.c_str(), !(selected && highlightValue));
+        const int valueX = spec.rowBackgrounds ? rowX + rowWidth - spec.textInsetX - valueWidth
+                                               : rect.x + contentWidth - metrics().contentSidePadding - valueWidth;
+        renderer.drawText(spec.valueFontId, valueX, valueY, valueText.c_str(),
+                          !(selected && (highlightValue || (spec.rowBackgrounds && spec.selectedTextInverted))));
       }
     }
     return;
@@ -565,6 +649,7 @@ void LyraTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
   renderer.setOrientation(GfxRenderer::Orientation::Portrait);
 
   const int pageHeight = renderer.getScreenHeight();
+  const int pageWidth = renderer.getScreenWidth();
   const int buttonWidth = buttonHints_ != nullptr && buttonHints_->enabled ? buttonHints_->buttonWidth : 80;
   const int smallButtonHeight =
       buttonHints_ != nullptr && buttonHints_->enabled ? buttonHints_->smallButtonHeight : 15;
@@ -576,8 +661,45 @@ void LyraTheme::drawButtonHints(GfxRenderer& renderer, const char* btn1, const c
   const int fontId = buttonHints_ != nullptr && buttonHints_->enabled ? buttonHints_->fontId : SMALL_FONT_ID;
   const auto style = buttonHints_ != nullptr && buttonHints_->enabled && buttonHints_->bold ? EpdFontFamily::BOLD
                                                                                            : EpdFontFamily::REGULAR;
-  const bool shapes = buttonHints_ != nullptr && buttonHints_->enabled && buttonHints_->shapes;
+  const ThemeButtonHintsStyle hintStyle =
+      buttonHints_ != nullptr && buttonHints_->enabled ? buttonHints_->style : ThemeButtonHintsStyle::Buttons;
+  const bool shapes = hintStyle == ThemeButtonHintsStyle::Shapes;
   const int shapeSize = buttonHints_ != nullptr && buttonHints_->enabled ? buttonHints_->shapeSize : 18;
+  if (hintStyle == ThemeButtonHintsStyle::Groups) {
+    const int sidePadding = buttonHints_->sidePadding;
+    const int groupGap = buttonHints_->groupGap;
+    const int bottomMargin = buttonHints_->bottomMargin;
+    const int innerPadding = buttonHints_->innerPadding;
+    const int hintHeight = std::max(1, metrics().buttonHintsHeight - bottomMargin);
+    const int groupWidth = std::max(1, (pageWidth - sidePadding * 2 - groupGap) / 2);
+    const int outlineY = pageHeight - hintHeight - bottomMargin;
+    const int leftGroupX = sidePadding;
+    const int rightGroupX = leftGroupX + groupWidth + groupGap;
+    const char* labels[] = {btn1, btn2, btn3, btn4};
+    const int selectWidth = labels[1] != nullptr ? renderer.getTextWidth(fontId, labels[1], style) : 0;
+    const int downWidth = labels[3] != nullptr ? renderer.getTextWidth(fontId, labels[3], style) : 0;
+
+    renderer.fillRect(leftGroupX, outlineY, groupWidth, hintHeight, false);
+    renderer.fillRect(rightGroupX, outlineY, groupWidth, hintHeight, false);
+    renderer.drawRoundedRect(leftGroupX, outlineY, groupWidth, hintHeight, 2, buttonCornerRadius, true);
+    renderer.drawRoundedRect(rightGroupX, outlineY, groupWidth, hintHeight, 2, buttonCornerRadius, true);
+
+    const int textY = outlineY + (hintHeight - renderer.getLineHeight(fontId)) / 2;
+    if (labels[0] != nullptr && labels[0][0] != '\0') {
+      renderer.drawText(fontId, leftGroupX + innerPadding, textY, labels[0], true, style);
+    }
+    if (labels[1] != nullptr && labels[1][0] != '\0') {
+      renderer.drawText(fontId, leftGroupX + groupWidth - innerPadding - selectWidth, textY, labels[1], true, style);
+    }
+    if (labels[2] != nullptr && labels[2][0] != '\0') {
+      renderer.drawText(fontId, rightGroupX + innerPadding, textY, labels[2], true, style);
+    }
+    if (labels[3] != nullptr && labels[3][0] != '\0') {
+      renderer.drawText(fontId, rightGroupX + groupWidth - innerPadding - downWidth, textY, labels[3], true, style);
+    }
+    renderer.setOrientation(orig_orientation);
+    return;
+  }
   // X3 has wider screen in portrait (528 vs 480), use more spacing
   constexpr int x4ButtonPositions[] = {58, 146, 254, 342};
   constexpr int x3ButtonPositions[] = {65, 157, 291, 383};
@@ -825,7 +947,16 @@ void LyraTheme::drawCoverStripRecents(GfxRenderer& renderer, Rect rect, const st
         if (!Storage.openFileForRead("HOME", coverBmpPath, file)) return false;
         Bitmap bitmap(file);
         if (bitmap.parseHeaders() == BmpReaderError::Ok) {
-          renderer.drawBitmap(bitmap, x, y, w, h);
+          float cropX = 0.0f;
+          float cropY = 0.0f;
+          const float bitmapAspect = static_cast<float>(bitmap.getWidth()) / static_cast<float>(bitmap.getHeight());
+          const float targetAspect = static_cast<float>(w) / static_cast<float>(h);
+          if (bitmapAspect > targetAspect) {
+            cropX = std::max(0.0f, 1.0f - targetAspect / bitmapAspect);
+          } else if (bitmapAspect < targetAspect) {
+            cropY = std::max(0.0f, 1.0f - bitmapAspect / targetAspect);
+          }
+          renderer.drawBitmap(bitmap, x, y, w, h, cropX, cropY);
           return true;
         } else {
           return false;
@@ -923,12 +1054,24 @@ void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount
     }
 
     for (int i = 0; i < buttonCount; ++i) {
-      Rect tileRect = Rect{panelX + spec.selectionInset,
-                           panelY + i * (m.menuRowHeight + m.menuSpacing),
+      std::string labelStr = buttonLabel(i);
+      const char* label = labelStr.c_str();
+      const auto style = spec.bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR;
+      Rect tileRect = Rect{panelX + spec.selectionInset, panelY + i * (m.menuRowHeight + m.menuSpacing),
                            panelWidth - spec.selectionInset * 2, m.menuRowHeight};
+      if (spec.selectionStyle == ThemeMenuSelectionStyle::Pill) {
+        const int maxLabelWidth = std::max(0, panelWidth - spec.selectionInset * 2 - spec.rowPaddingX);
+        labelStr = renderer.truncatedText(spec.fontId, label, maxLabelWidth, style);
+        label = labelStr.c_str();
+        tileRect.width =
+            std::min(tileRect.width, renderer.getTextWidth(spec.fontId, label, style) + spec.rowPaddingX);
+      }
       const bool selected = selectedIndex == i;
 
-      if (selected) {
+      if (spec.selectionStyle == ThemeMenuSelectionStyle::Pill) {
+        renderer.fillRoundedRect(tileRect.x, tileRect.y, tileRect.width, tileRect.height, spec.selectionCornerRadius,
+                                 selected ? Color::Black : Color::White);
+      } else if (selected) {
         if (spec.selectionStyle == ThemeMenuSelectionStyle::Outline) {
           renderer.drawRoundedRect(tileRect.x, tileRect.y, tileRect.width, tileRect.height, 1,
                                    spec.selectionCornerRadius, true);
@@ -945,16 +1088,13 @@ void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount
           // Drawn after text layout below.
         } else {
           renderer.fillRoundedRect(tileRect.x, tileRect.y, tileRect.width, tileRect.height,
-                                   spec.selectionCornerRadius, Color::LightGray);
+                                   spec.selectionCornerRadius, spec.selectionFillBlack ? Color::Black : Color::LightGray);
         }
       }
 
-      std::string labelStr = buttonLabel(i);
-      const char* label = labelStr.c_str();
-      const auto style = spec.bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR;
       const int lineHeight = renderer.getLineHeight(spec.fontId);
       const int textY = tileRect.y + (tileRect.height - lineHeight) / 2;
-      int textX = tileRect.x + 16;
+      int textX = tileRect.x + spec.textInsetX;
 
       if (spec.showIcons && rowIcon != nullptr) {
         UIIcon icon = rowIcon(i);
@@ -974,7 +1114,10 @@ void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount
         const int textWidth = renderer.getTextWidth(spec.fontId, label, style);
         textX = tileRect.x + (tileRect.width - textWidth) / 2;
       }
-      renderer.drawText(spec.fontId, textX, textY, label, true, style);
+      renderer.drawText(spec.fontId, textX, textY, label,
+                        !(selected && (spec.selectedTextInverted ||
+                                       spec.selectionStyle == ThemeMenuSelectionStyle::Pill)),
+                        style);
       if (selected && spec.selectionStyle == ThemeMenuSelectionStyle::Underline) {
         const int textWidth = renderer.getTextWidth(spec.fontId, label, style);
         const int underlineY = std::min(tileRect.y + tileRect.height - 5, textY + lineHeight + 2);

@@ -5,8 +5,9 @@
   "description": "Centered text-only home menu with Continue Reading as the first item and no cover area.",
   "inherits": "lyra",
   "metrics": {
-    "headerHeight": 64,
-    "homeTopPadding": 64,
+    "headerHeight": 48,
+    "tabBarHeight": 36,
+    "homeTopPadding": 48,
     "homeCoverHeight": 0,
     "homeCoverTileHeight": 0,
     "homeRecentBooksCount": 1,
@@ -31,6 +32,39 @@
       "selectionStyle": "underline",
       "selectionCornerRadius": 6,
       "selectionInset": 18
+    },
+    "list": {
+      "font": "ui10",
+      "style": "regular",
+      "showIcons": false,
+      "textGap": 0,
+      "selectionCornerRadius": 0,
+      "selectionFill": false,
+      "selectionOutline": false,
+      "selectedTextInverted": false,
+      "selectionInsetX": 0,
+      "selectionInsetY": 0,
+      "titleOffsetY": 7,
+      "subtitleOffsetY": 30,
+      "valueOffsetY": 6,
+      "subtitleValueOffsetY": 16,
+      "iconOffsetY": 0
+    },
+    "header": {
+      "font": "ui10",
+      "style": "regular",
+      "centeredTitle": true,
+      "showDivider": false,
+      "titleOffsetY": 0
+    },
+    "tabBar": {
+      "font": "ui10",
+      "style": "regular",
+      "equalWidth": true,
+      "selectionStyle": "underline",
+      "selectedTextInverted": false,
+      "drawDivider": false,
+      "horizontalInset": 2
     },
     "buttonHints": {
       "font": "small",

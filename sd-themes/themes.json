@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "baseUrl": "http://crosspointreader.com/themes/",
+  "baseUrl": "https://crosspointreader.com/themes",
   "themes": [
     {
       "id": "carousel",
@@ -105,6 +105,20 @@
         }
       ],
       "totalSize": 6825
+    },
+    {
+      "id": "classic",
+      "name": "Classic",
+      "description": "Original CrossPoint classic UI rebuilt as an SD theme.",
+      "files": [
+        {
+          "path": "theme.json",
+          "url": "classic/theme.json",
+          "size": 4126,
+          "crc32": 1915678745
+        }
+      ],
+      "totalSize": 4126
     },
     {
       "id": "lyra-3-covers",
@@ -308,11 +322,11 @@
         {
           "path": "theme.json",
           "url": "roundedraff/theme.json",
-          "size": 3320,
-          "crc32": 1928449895
+          "size": 3821,
+          "crc32": 279424530
         }
       ],
-      "totalSize": 6010
+      "totalSize": 6511
     },
     {
       "id": "super-minimal",
@@ -412,11 +426,11 @@
         {
           "path": "theme.json",
           "url": "super-minimal/theme.json",
-          "size": 1640,
-          "crc32": 3212266381
+          "size": 2483,
+          "crc32": 4266934676
         }
       ],
-      "totalSize": 4330
+      "totalSize": 5173
     }
   ]
 }

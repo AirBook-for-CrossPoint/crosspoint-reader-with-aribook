@@ -75,13 +75,16 @@ class LyraTheme : public BaseTheme {
   explicit LyraTheme(const ThemeMetrics* metrics = &LyraMetrics::values,
                      const ThemeHomeRecentsSpec* homeRecents = nullptr,
                      const ThemeButtonMenuSpec* buttonMenu = nullptr, const ThemeListSpec* list = nullptr,
-                     const ThemeButtonHintsSpec* buttonHints = nullptr, const char* assetRoot = nullptr,
+                     const ThemeButtonHintsSpec* buttonHints = nullptr, const ThemeTabBarSpec* tabBar = nullptr,
+                     const ThemeHeaderSpec* header = nullptr, const char* assetRoot = nullptr,
                      const ThemeIconMap* icons = nullptr)
       : metrics_(metrics),
         homeRecents_(homeRecents),
         buttonMenu_(buttonMenu),
         list_(list),
         buttonHints_(buttonHints),
+        tabBar_(tabBar),
+        header_(header),
         assetRoot_(assetRoot),
         icons_(icons) {}
 
@@ -116,6 +119,8 @@ class LyraTheme : public BaseTheme {
   const ThemeButtonMenuSpec* buttonMenu_;
   const ThemeListSpec* list_;
   const ThemeButtonHintsSpec* buttonHints_;
+  const ThemeTabBarSpec* tabBar_;
+  const ThemeHeaderSpec* header_;
   const char* assetRoot_;
   const ThemeIconMap* icons_;
   const ThemeMetrics& metrics() const { return metrics_ ? *metrics_ : LyraMetrics::values; }

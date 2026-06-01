@@ -43,6 +43,8 @@ class UITheme {
   ThemeButtonMenuSpec currentSdButtonMenu;
   ThemeListSpec currentSdList;
   ThemeButtonHintsSpec currentSdButtonHints;
+  ThemeTabBarSpec currentSdTabBar;
+  ThemeHeaderSpec currentSdHeader;
   std::string currentSdThemePath;
   ThemeIconMap currentSdIcons;
   std::unique_ptr<BaseTheme> currentTheme;

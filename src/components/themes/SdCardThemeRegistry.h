@@ -23,6 +23,8 @@ struct SdCardThemeInfo {
   ThemeButtonMenuSpec buttonMenu;
   ThemeListSpec list;
   ThemeButtonHintsSpec buttonHints;
+  ThemeTabBarSpec tabBar;
+  ThemeHeaderSpec header;
   ThemeIconMap icons;
   SdThemeDeviceConstraints constraints;
 };

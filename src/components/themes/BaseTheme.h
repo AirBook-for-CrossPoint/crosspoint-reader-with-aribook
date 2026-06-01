@@ -103,7 +103,8 @@ enum class ThemeHomeRecentsType { Default, None, CoverStrip };
 enum class ThemeBookRef { Previous, Selected, Next, Index };
 enum class ThemeSlotX { Padding, Center, RightPadding };
 enum class ThemeSlotY { Top, Center };
-enum class ThemeMenuSelectionStyle { Fill, Outline, Triangle, Underline };
+enum class ThemeMenuSelectionStyle { Fill, Outline, Triangle, Underline, Pill };
+enum class ThemeButtonHintsStyle { Buttons, Shapes, Groups };
 
 struct ThemeTitleSpec {
   bool enabled = false;
@@ -148,6 +149,10 @@ struct ThemeButtonMenuSpec {
   ThemeMenuSelectionStyle selectionStyle = ThemeMenuSelectionStyle::Fill;
   int selectionCornerRadius = 6;
   int selectionInset = 16;
+  bool selectedTextInverted = false;
+  bool selectionFillBlack = false;
+  int rowPaddingX = 16;
+  int textInsetX = 16;
 };
 
 struct ThemeListSpec {
@@ -163,6 +168,9 @@ struct ThemeListSpec {
   bool selectionFill = true;
   bool selectionOutline = false;
   bool selectedTextInverted = false;
+  bool rowBackgrounds = false;
+  int rowSidePadding = 0;
+  int textInsetX = 8;
   int selectionInsetX = 0;
   int selectionInsetY = 0;
   int titleOffsetY = 7;
@@ -183,8 +191,34 @@ struct ThemeButtonHintsSpec {
   bool outline = true;
   bool drawEmpty = true;
   bool shapes = false;
+  ThemeButtonHintsStyle style = ThemeButtonHintsStyle::Buttons;
+  int sidePadding = 20;
+  int groupGap = 10;
+  int bottomMargin = 10;
+  int innerPadding = 16;
   int shapeSize = 18;
   int textOffsetY = 7;
+};
+
+struct ThemeTabBarSpec {
+  bool enabled = false;
+  int fontId = 10;
+  bool bold = false;
+  bool equalWidth = false;
+  ThemeMenuSelectionStyle selectionStyle = ThemeMenuSelectionStyle::Fill;
+  int selectedCornerRadius = 6;
+  bool selectedTextInverted = true;
+  bool drawDivider = true;
+  int horizontalInset = 2;
+};
+
+struct ThemeHeaderSpec {
+  bool enabled = false;
+  int fontId = 12;
+  bool bold = true;
+  bool centeredTitle = false;
+  bool showDivider = true;
+  int titleOffsetY = 0;
 };
 
 enum UIIcon { None = 0, Folder, Text, Image, Book, File, Recent, Settings, Transfer, Library, Wifi, Hotspot, Bookmark };
