@@ -50,6 +50,7 @@ struct ThemeMetrics {
   int homeCoverTileHeight;
   int homeRecentBooksCount;
   bool homeContinueReadingInMenu;
+  bool homeShowContinueReadingHeader;
   int homeMenuTopOffset;
 
   int buttonHintsHeight;
@@ -102,7 +103,7 @@ enum class ThemeHomeRecentsType { Default, None, CoverStrip };
 enum class ThemeBookRef { Previous, Selected, Next, Index };
 enum class ThemeSlotX { Padding, Center, RightPadding };
 enum class ThemeSlotY { Top, Center };
-enum class ThemeMenuSelectionStyle { Fill, Outline, Triangle };
+enum class ThemeMenuSelectionStyle { Fill, Outline, Triangle, Underline };
 
 struct ThemeTitleSpec {
   bool enabled = false;
@@ -214,6 +215,7 @@ constexpr ThemeMetrics values = {.batteryWidth = 15,
                                  .homeCoverTileHeight = 400,
                                  .homeRecentBooksCount = 1,
                                  .homeContinueReadingInMenu = false,
+                                 .homeShowContinueReadingHeader = true,
                                  .homeMenuTopOffset = 10,
                                  .buttonHintsHeight = 40,
                                  .sideButtonHintsWidth = 30,

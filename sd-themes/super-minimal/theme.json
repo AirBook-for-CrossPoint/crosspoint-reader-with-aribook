@@ -11,6 +11,7 @@
     "homeCoverTileHeight": 0,
     "homeRecentBooksCount": 1,
     "homeContinueReadingInMenu": true,
+    "homeShowContinueReadingHeader": true,
     "homeMenuTopOffset": 0,
     "menuRowHeight": 42,
     "menuSpacing": 6
@@ -27,7 +28,7 @@
       "showIcons": false,
       "drawPanel": false,
       "panelWidth": 360,
-      "selectionStyle": "outline",
+      "selectionStyle": "underline",
       "selectionCornerRadius": 6,
       "selectionInset": 18
     },

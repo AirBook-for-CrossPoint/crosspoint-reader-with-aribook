@@ -40,6 +40,7 @@ void applyMetricOverrides(JsonObjectConst obj, ThemeMetrics& metrics) {
   APPLY_INT_FIELD(homeCoverTileHeight);
   APPLY_INT_FIELD(homeRecentBooksCount);
   APPLY_BOOL_FIELD(homeContinueReadingInMenu);
+  APPLY_BOOL_FIELD(homeShowContinueReadingHeader);
   APPLY_INT_FIELD(homeMenuTopOffset);
   APPLY_INT_FIELD(buttonHintsHeight);
   APPLY_INT_FIELD(sideButtonHintsWidth);
@@ -220,6 +221,8 @@ void parseButtonMenuSpec(JsonObjectConst obj, ThemeButtonMenuSpec& spec) {
       spec.selectionStyle = ThemeMenuSelectionStyle::Outline;
     } else if (strcmp(selectionStyle, "triangle") == 0) {
       spec.selectionStyle = ThemeMenuSelectionStyle::Triangle;
+    } else if (strcmp(selectionStyle, "underline") == 0) {
+      spec.selectionStyle = ThemeMenuSelectionStyle::Underline;
     } else {
       spec.selectionStyle = ThemeMenuSelectionStyle::Fill;
     }
@@ -364,6 +367,9 @@ bool SdCardThemeRegistry::parseThemeJson(const char* themeDirPath, SdCardThemeIn
   applyMetricOverrides(deviceObj["metrics"].as<JsonObjectConst>(), out.metrics);
   if (out.homeRecents.type == ThemeHomeRecentsType::CoverStrip) {
     out.metrics.homeRecentBooksCount = std::max(1, out.homeRecents.maxBooks);
+  } else if (out.homeRecents.type == ThemeHomeRecentsType::None) {
+    out.metrics.homeCoverHeight = 0;
+    out.metrics.homeCoverTileHeight = 0;
   }
   out.constraints.screenWidth = deviceObj["constraints"]["screenWidth"] | doc["constraints"]["screenWidth"] | 0;
   out.constraints.screenHeight = deviceObj["constraints"]["screenHeight"] | doc["constraints"]["screenHeight"] | 0;

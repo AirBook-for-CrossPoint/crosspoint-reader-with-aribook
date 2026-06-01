@@ -819,6 +819,8 @@ void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount
           const int triangleYPoints[3] = {triangleCenterY - triangleHeight / 2,
                                           triangleCenterY + triangleHeight / 2, triangleCenterY};
           renderer.fillPolygon(triangleXPoints, triangleYPoints, 3, true);
+        } else if (spec.selectionStyle == ThemeMenuSelectionStyle::Underline) {
+          // Drawn after text layout below.
         } else {
           renderer.fillRoundedRect(tileRect.x, tileRect.y, tileRect.width, tileRect.height,
                                    spec.selectionCornerRadius, Color::LightGray);
@@ -850,6 +852,11 @@ void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount
         textX = tileRect.x + (tileRect.width - textWidth) / 2;
       }
       renderer.drawText(spec.fontId, textX, textY, label, true, style);
+      if (selected && spec.selectionStyle == ThemeMenuSelectionStyle::Underline) {
+        const int textWidth = renderer.getTextWidth(spec.fontId, label, style);
+        const int underlineY = std::min(tileRect.y + tileRect.height - 5, textY + lineHeight + 2);
+        renderer.drawLine(textX, underlineY, textX + textWidth - 1, underlineY, 1, true);
+      }
     }
     return;
   }
