@@ -27,6 +27,8 @@ constexpr int HTTP_TX_BUF = 1024;
 // HTTPClient's uint16 setTimeout it doesn't silently truncate.
 constexpr int HTTP_TIMEOUT_MS = 60000;
 constexpr size_t READ_CHUNK = 1024;
+constexpr uint32_t PROGRESS_INTERVAL_MS = 500;
+constexpr size_t MIN_PROGRESS_STEP_BYTES = 16 * 1024;
 
 struct Sink {
   std::function<bool(const uint8_t*, size_t)> write;  // returns false to abort the transfer
@@ -85,7 +87,7 @@ bool sameOrigin(const ParsedUrl& a, const ParsedUrl& b) {
 }
 
 std::string buildRedirectUrl(const std::string& baseUrl, const std::string& location) {
-  if (location.find("http://") == 0 || location.find("https://") == 0) return location;
+  if (location.starts_with("http://") || location.starts_with("https://")) return location;
 
   ParsedUrl base;
   if (!parseUrl(baseUrl, base)) return location;
@@ -189,6 +191,8 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
     // fetch_headers returns 0 for a chunked response (no Content-Length); leave
     // total at 0 so progress stays silent and the size check is skipped.
     sink.total = contentLength > 0 ? static_cast<size_t>(contentLength) : 0;
+    size_t lastProgressBytes = 0;
+    uint32_t lastProgressMs = millis();
 
     auto buf = makeUniqueNoThrow<char[]>(READ_CHUNK);
     if (!buf) {
@@ -214,7 +218,17 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
         return HttpDownloader::FILE_ERROR;
       }
       sink.downloaded += read;
-      if (sink.progress && sink.total > 0) sink.progress(sink.downloaded, sink.total);
+      if (sink.progress && sink.total > 0) {
+        const uint32_t now = millis();
+        const size_t percentStep = sink.total / 20;
+        const size_t progressStep = percentStep > MIN_PROGRESS_STEP_BYTES ? percentStep : MIN_PROGRESS_STEP_BYTES;
+        if (sink.downloaded >= sink.total || sink.downloaded - lastProgressBytes >= progressStep ||
+            now - lastProgressMs >= PROGRESS_INTERVAL_MS) {
+          sink.progress(sink.downloaded, sink.total);
+          lastProgressBytes = sink.downloaded;
+          lastProgressMs = now;
+        }
+      }
       if (sink.total > 0 && sink.downloaded >= sink.total) break;
     }
 
