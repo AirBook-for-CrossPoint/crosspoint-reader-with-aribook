@@ -200,7 +200,7 @@ bool LyraTheme::drawThemeIcon(const GfxRenderer& renderer, UIIcon icon, int x, i
   }
   const int drawnWidth = std::max(1, static_cast<int>(std::floor(bitmap.getWidth() * scale)));
   const int drawnHeight = std::max(1, static_cast<int>(std::floor(bitmap.getHeight() * scale)));
-  renderer.drawBitmap(bitmap, x + (size - drawnWidth) / 2, y + (size - drawnHeight) / 2, size, size);
+  renderer.drawBitmap(bitmap, x + (size - drawnWidth) / 2, y + (size - drawnHeight) / 2, drawnWidth, drawnHeight);
   return true;
 }
 
