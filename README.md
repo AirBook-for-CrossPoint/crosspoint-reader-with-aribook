@@ -135,12 +135,14 @@ Conversion runs the firmware repo's `lib/EpdFont/scripts/fontconvert_sdcard.py` 
 
 Downloadable themes are packaged under `sd-themes/<theme-id>/`. Each theme folder must contain a `theme.json`; optional assets such as generated BMP icons live beside it, usually under `icons/`.
 
+See [SD-card theme creation](./docs/theme-creation.md) for the full JSON format, device-specific overrides, icon generation, CrossInk extension fields, and packaging rules.
+
 After adding or changing a hosted theme, regenerate the download manifest:
 
 ```bash
 python3 scripts/generate-theme-manifest.py \
   --root sd-themes \
-  --base-url http://crosspointreader.com/themes/ \
+  --base-url https://crosspointreader.com/themes \
   --output sd-themes/themes.json
 ```
 
@@ -153,6 +155,7 @@ The script scans every theme folder, includes every file in each package, and wr
 - [User Guide](./USER_GUIDE.md)
 - [Web server usage](./docs/webserver.md)
 - [Web server endpoints](./docs/webserver-endpoints.md)
+- [SD-card theme creation](./docs/theme-creation.md)
 - [Project scope](./SCOPE.md)
 - [Contributing docs](./docs/contributing/README.md)
 
