@@ -69,7 +69,7 @@ bool ThemeDownloadActivity::fetchAndParseManifest() {
   auto result = HttpDownloader::downloadToFile(THEME_MANIFEST_URL, MANIFEST_TMP, nullptr);
   if (result != HttpDownloader::OK) {
     LOG_ERR("THEME", "Failed to fetch manifest from %s", THEME_MANIFEST_URL);
-    errorMessage_ = "Failed to fetch theme list";
+    errorMessage_ = tr(STR_DOWNLOAD_FAILED);
     Storage.remove(MANIFEST_TMP);
     return false;
   }
@@ -77,7 +77,7 @@ bool ThemeDownloadActivity::fetchAndParseManifest() {
   HalFile manifestFile;
   if (!Storage.openFileForRead("THEME", MANIFEST_TMP, manifestFile)) {
     Storage.remove(MANIFEST_TMP);
-    errorMessage_ = "Failed to read theme list";
+    errorMessage_ = tr(STR_DOWNLOAD_FAILED);
     return false;
   }
 
@@ -88,14 +88,14 @@ bool ThemeDownloadActivity::fetchAndParseManifest() {
 
   if (err) {
     LOG_ERR("THEME", "Manifest parse error: %s", err.c_str());
-    errorMessage_ = "Invalid theme manifest";
+    errorMessage_ = tr(STR_DOWNLOAD_FAILED);
     return false;
   }
 
   const int version = doc["version"] | 0;
   if (version != THEMES_MANIFEST_VERSION) {
     LOG_ERR("THEME", "Unsupported manifest version: %d", version);
-    errorMessage_ = "Unsupported manifest version";
+    errorMessage_ = tr(STR_DOWNLOAD_FAILED);
     return false;
   }
 
@@ -124,7 +124,7 @@ bool ThemeDownloadActivity::fetchAndParseManifest() {
     theme.description = tObj["description"] | "";
 
     if (!ThemeInstaller::isValidThemeId(theme.id.c_str())) {
-      errorMessage_ = "Invalid theme manifest";
+      errorMessage_ = tr(STR_DOWNLOAD_FAILED);
       return false;
     }
 
@@ -137,7 +137,7 @@ bool ThemeDownloadActivity::fetchAndParseManifest() {
       file.size = fileObj["size"] | 0;
       if (!ThemeInstaller::isValidRelativePath(file.path.c_str()) ||
           !ThemeInstaller::isValidRelativePath(file.url.c_str()) || !fileObj["crc32"].is<uint32_t>()) {
-        errorMessage_ = "Invalid theme manifest";
+        errorMessage_ = tr(STR_DOWNLOAD_FAILED);
         return false;
       }
       file.crc32 = fileObj["crc32"].as<uint32_t>();
@@ -268,7 +268,7 @@ void ThemeDownloadActivity::downloadTheme(ManifestTheme& theme) {
   if (!themeInstaller_.ensureThemeDir(theme.id.c_str())) {
     RenderLock lock(*this);
     state_ = ERROR;
-    errorMessage_ = "Failed to create theme directory";
+    errorMessage_ = tr(STR_THEME_INSTALL_FAILED);
     return;
   }
 
@@ -286,7 +286,7 @@ void ThemeDownloadActivity::downloadTheme(ManifestTheme& theme) {
     if (!themeInstaller_.ensureParentDirs(destPath)) {
       RenderLock lock(*this);
       state_ = ERROR;
-      errorMessage_ = "Failed to create theme directory";
+      errorMessage_ = tr(STR_THEME_INSTALL_FAILED);
       return;
     }
 
@@ -320,7 +320,7 @@ void ThemeDownloadActivity::downloadTheme(ManifestTheme& theme) {
       theme.hasUpdate = false;
       RenderLock lock(*this);
       state_ = ERROR;
-      errorMessage_ = "Download failed: " + file.path;
+      errorMessage_ = std::string(tr(STR_DOWNLOAD_FAILED)) + ": " + file.path;
       return;
     }
 
@@ -332,7 +332,7 @@ void ThemeDownloadActivity::downloadTheme(ManifestTheme& theme) {
       theme.hasUpdate = false;
       RenderLock lock(*this);
       state_ = ERROR;
-      errorMessage_ = "Invalid theme file: " + file.path;
+      errorMessage_ = tr(STR_THEME_INSTALL_FAILED);
       return;
     }
     currentFileIndex_++;
@@ -363,7 +363,7 @@ void ThemeDownloadActivity::onDeleteConfirmationResult(const ActivityResult& res
   if (themeInstaller_.deleteTheme(theme.id.c_str()) != ThemeInstaller::Error::OK) {
     RenderLock lock(*this);
     state_ = ERROR;
-    errorMessage_ = "Failed to delete theme";
+    errorMessage_ = tr(STR_THEME_INSTALL_FAILED);
   } else {
     theme.installed = false;
     theme.hasUpdate = false;

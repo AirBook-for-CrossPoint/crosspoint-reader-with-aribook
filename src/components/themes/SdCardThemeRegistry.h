@@ -50,5 +50,6 @@ class SdCardThemeRegistry {
   static const char* activeDeviceId();
   static bool parseThemeJson(const char* themeDirPath, SdCardThemeInfo& out);
   static bool isSafeId(const char* value);
+  static bool isSafeThemeId(const char* value);
   static void scanRoot(const char* rootPath, std::vector<SdCardThemeInfo>& out);
 };

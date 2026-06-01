@@ -408,6 +408,16 @@ bool SdCardThemeRegistry::isSafeId(const char* value) {
   return true;
 }
 
+bool SdCardThemeRegistry::isSafeThemeId(const char* value) {
+  if (value == nullptr || value[0] == '\0') return false;
+  if (strstr(value, "..") != nullptr || strchr(value, '/') != nullptr || strchr(value, '\\') != nullptr) return false;
+  for (const char* p = value; *p != '\0'; ++p) {
+    const char c = *p;
+    if (!std::isalnum(static_cast<unsigned char>(c)) && c != '-' && c != '_') return false;
+  }
+  return true;
+}
+
 bool SdCardThemeRegistry::parseThemeJson(const char* themeDirPath, SdCardThemeInfo& out) {
   char jsonPath[180];
   snprintf(jsonPath, sizeof(jsonPath), "%s/theme.json", themeDirPath);
@@ -433,7 +443,7 @@ bool SdCardThemeRegistry::parseThemeJson(const char* themeDirPath, SdCardThemeIn
 
   const char* id = doc["id"] | "";
   const char* name = doc["name"] | id;
-  if (!isSafeId(id) || !isSafeId(name)) {
+  if (!isSafeThemeId(id) || !isSafeId(name)) {
     LOG_ERR("THREG", "Invalid theme id/name in %s", jsonPath);
     return false;
   }
@@ -502,7 +512,7 @@ void SdCardThemeRegistry::scanRoot(const char* rootPath, std::vector<SdCardTheme
     entry.getName(nameBuffer, sizeof(nameBuffer));
     entry.close();
     if (nameBuffer[0] == '.' || nameBuffer[0] == '_') continue;
-    if (!isSafeId(nameBuffer)) continue;
+    if (!isSafeThemeId(nameBuffer)) continue;
 
     char themeDirPath[180];
     snprintf(themeDirPath, sizeof(themeDirPath), "%s/%s", rootPath, nameBuffer);
@@ -554,7 +564,7 @@ const SdCardThemeInfo* SdCardThemeRegistry::findTheme(const std::string& id) con
 }
 
 const char* SdCardThemeRegistry::findThemeRoot(const char* themeId) {
-  if (!isSafeId(themeId)) return nullptr;
+  if (!isSafeThemeId(themeId)) return nullptr;
   char path[180];
   snprintf(path, sizeof(path), "%s/%s", THEMES_DIR_HIDDEN, themeId);
   if (Storage.exists(path)) return THEMES_DIR_HIDDEN;
