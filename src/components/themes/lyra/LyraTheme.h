@@ -71,12 +71,18 @@ constexpr ThemeMetrics values = {.batteryWidth = 16,
 
 class LyraTheme : public BaseTheme {
  public:
-  enum class Variant { Standard, ThreeCovers, RoundedRaff, Carousel };
-
-  explicit LyraTheme(Variant variant = Variant::Standard, const ThemeMetrics* metrics = &LyraMetrics::values,
+  explicit LyraTheme(const ThemeMetrics* metrics = &LyraMetrics::values,
                      const ThemeHomeRecentsSpec* homeRecents = nullptr,
-                     const ThemeButtonMenuSpec* buttonMenu = nullptr)
-      : variant_(variant), metrics_(metrics), homeRecents_(homeRecents), buttonMenu_(buttonMenu) {}
+                     const ThemeButtonMenuSpec* buttonMenu = nullptr, const ThemeListSpec* list = nullptr,
+                     const ThemeButtonHintsSpec* buttonHints = nullptr, const char* assetRoot = nullptr,
+                     const ThemeIconMap* icons = nullptr)
+      : metrics_(metrics),
+        homeRecents_(homeRecents),
+        buttonMenu_(buttonMenu),
+        list_(list),
+        buttonHints_(buttonHints),
+        assetRoot_(assetRoot),
+        icons_(icons) {}
 
   // Component drawing methods
   void fillBatteryIcon(const GfxRenderer& renderer, Rect rect, uint16_t percentage) const override;
@@ -104,60 +110,16 @@ class LyraTheme : public BaseTheme {
   bool showsFileIcons() const override { return true; }
 
  private:
-  Variant variant_;
   const ThemeMetrics* metrics_;
   const ThemeHomeRecentsSpec* homeRecents_;
   const ThemeButtonMenuSpec* buttonMenu_;
+  const ThemeListSpec* list_;
+  const ThemeButtonHintsSpec* buttonHints_;
+  const char* assetRoot_;
+  const ThemeIconMap* icons_;
   const ThemeMetrics& metrics() const { return metrics_ ? *metrics_ : LyraMetrics::values; }
-  void drawThreeCoverRecents(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,
-                             int selectorIndex, bool& coverRendered, bool& coverBufferStored,
-                             std::function<bool()> storeCoverBuffer) const;
-  void drawCarouselRecents(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,
-                           int selectorIndex, bool& coverRendered, bool& coverBufferStored,
-                           std::function<bool()> storeCoverBuffer) const;
+  bool hasThemeIcon(UIIcon icon) const;
+  bool drawThemeIcon(GfxRenderer& renderer, UIIcon icon, int x, int y, int size) const;
   void drawCoverStripRecents(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,
                              int selectorIndex, bool& coverRendered, bool& coverBufferStored) const;
 };
-
-namespace SdLyraMetrics {
-constexpr ThemeMetrics threeCovers = [] {
-  ThemeMetrics v = LyraMetrics::values;
-  v.homeCoverTileHeight = 300;
-  v.homeRecentBooksCount = 3;
-  return v;
-}();
-
-constexpr ThemeMetrics carousel = [] {
-  ThemeMetrics v = LyraMetrics::values;
-  v.homeCoverHeight = 300;
-  v.homeCoverTileHeight = 340;
-  v.homeRecentBooksCount = 3;
-  return v;
-}();
-
-constexpr ThemeMetrics roundedRaff = [] {
-  ThemeMetrics v = LyraMetrics::values;
-  v.topPadding = 0;
-  v.headerHeight = 45;
-  v.listRowHeight = 42;
-  v.listWithSubtitleRowHeight = 69;
-  v.menuRowHeight = 42;
-  v.menuSpacing = 6;
-  v.homeTopPadding = 55;
-  v.homeCoverHeight = 300;
-  v.homeCoverTileHeight = 350;
-  v.homeContinueReadingInMenu = true;
-  v.homeMenuTopOffset = 20;
-  v.keyboardKeyHeight = 30;
-  v.keyboardKeySpacing = 10;
-  v.keyboardBottomKeyHeight = 30;
-  v.keyboardKeyCornerRadius = 10;
-  v.keyboardFillUnselected = true;
-  v.keyboardOutlineAllUnselected = true;
-  v.popupCornerRadius = 18;
-  v.popupTextBold = true;
-  v.popupProgressDrawOutline = true;
-  v.popupProgressClampPercent = true;
-  return v;
-}();
-}  // namespace SdLyraMetrics

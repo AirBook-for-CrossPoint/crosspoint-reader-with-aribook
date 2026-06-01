@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <cstdint>
 #include <functional>
+#include <map>
 #include <string>
 #include <vector>
 
@@ -147,7 +148,44 @@ struct ThemeButtonMenuSpec {
   int selectionInset = 16;
 };
 
+struct ThemeListSpec {
+  bool enabled = false;
+  int fontId = 10;
+  bool bold = false;
+  int subtitleFontId = 0;
+  int valueFontId = 0;
+  bool showIcons = true;
+  int iconSize = 0;
+  int textGap = 8;
+  int selectionCornerRadius = 6;
+  bool selectionFill = true;
+  bool selectionOutline = false;
+  bool selectedTextInverted = false;
+  int selectionInsetX = 0;
+  int selectionInsetY = 0;
+  int titleOffsetY = 7;
+  int subtitleOffsetY = 30;
+  int valueOffsetY = 6;
+  int subtitleValueOffsetY = 16;
+  int iconOffsetY = 0;
+};
+
+struct ThemeButtonHintsSpec {
+  bool enabled = false;
+  int fontId = 0;
+  bool bold = false;
+  int buttonWidth = 80;
+  int smallButtonHeight = 15;
+  int cornerRadius = 6;
+  bool fill = true;
+  bool outline = true;
+  bool drawEmpty = true;
+  int textOffsetY = 7;
+};
+
 enum UIIcon { None = 0, Folder, Text, Image, Book, File, Recent, Settings, Transfer, Library, Wifi, Hotspot, Bookmark };
+
+using ThemeIconMap = std::map<UIIcon, std::string>;
 
 enum class KeyboardKeyType { Normal, Shift, Mode, Space, Del, Ok, Disabled };
 

@@ -11,6 +11,7 @@
 
 #include "components/themes/lyra/LyraTheme.h"
 #include "fontIds.h"
+#include "ThemeInstaller.h"
 
 namespace {
 constexpr int THEME_SCHEMA_VERSION = 1;
@@ -224,47 +225,76 @@ void parseButtonMenuSpec(JsonObjectConst obj, ThemeButtonMenuSpec& spec) {
   }
 }
 
-ThemeMetrics defaultMetricsFor(SdThemeLayout layout) {
-  ThemeMetrics metrics = LyraMetrics::values;
-  switch (layout) {
-    case SdThemeLayout::ThreeCovers:
-      metrics.homeCoverTileHeight = 300;
-      metrics.homeRecentBooksCount = 3;
-      break;
-    case SdThemeLayout::Carousel:
-      metrics.homeCoverHeight = 300;
-      metrics.homeCoverTileHeight = 340;
-      metrics.homeRecentBooksCount = 3;
-      break;
-    case SdThemeLayout::RoundedRaff:
-      metrics.topPadding = 0;
-      metrics.headerHeight = 45;
-      metrics.listRowHeight = 42;
-      metrics.listWithSubtitleRowHeight = 69;
-      metrics.menuRowHeight = 42;
-      metrics.menuSpacing = 6;
-      metrics.homeTopPadding = 55;
-      metrics.homeCoverHeight = 300;
-      metrics.homeCoverTileHeight = 350;
-      metrics.homeContinueReadingInMenu = true;
-      metrics.homeMenuTopOffset = 20;
-      metrics.keyboardKeyHeight = 30;
-      metrics.keyboardKeySpacing = 10;
-      metrics.keyboardBottomKeyHeight = 30;
-      metrics.keyboardKeyCornerRadius = 10;
-      metrics.keyboardFillUnselected = true;
-      metrics.keyboardOutlineAllUnselected = true;
-      metrics.popupCornerRadius = 18;
-      metrics.popupTextBold = true;
-      metrics.popupProgressDrawOutline = true;
-      metrics.popupProgressClampPercent = true;
-      break;
-    case SdThemeLayout::Lyra:
-    default:
-      break;
-  }
-  return metrics;
+void parseListSpec(JsonObjectConst obj, ThemeListSpec& spec) {
+  if (obj.isNull()) return;
+  spec.enabled = true;
+  applyFontSpec(obj, spec.fontId, spec.bold);
+  spec.subtitleFontId = obj["subtitleFontId"] | spec.subtitleFontId;
+  spec.valueFontId = obj["valueFontId"] | spec.valueFontId;
+  spec.showIcons = obj["showIcons"] | spec.showIcons;
+  spec.iconSize = obj["iconSize"] | spec.iconSize;
+  spec.textGap = obj["textGap"] | spec.textGap;
+  spec.selectionCornerRadius = obj["selectionCornerRadius"] | spec.selectionCornerRadius;
+  spec.selectionFill = obj["selectionFill"] | spec.selectionFill;
+  spec.selectionOutline = obj["selectionOutline"] | spec.selectionOutline;
+  spec.selectedTextInverted = obj["selectedTextInverted"] | spec.selectedTextInverted;
+  spec.selectionInsetX = obj["selectionInsetX"] | spec.selectionInsetX;
+  spec.selectionInsetY = obj["selectionInsetY"] | spec.selectionInsetY;
+  spec.titleOffsetY = obj["titleOffsetY"] | spec.titleOffsetY;
+  spec.subtitleOffsetY = obj["subtitleOffsetY"] | spec.subtitleOffsetY;
+  spec.valueOffsetY = obj["valueOffsetY"] | spec.valueOffsetY;
+  spec.subtitleValueOffsetY = obj["subtitleValueOffsetY"] | spec.subtitleValueOffsetY;
+  spec.iconOffsetY = obj["iconOffsetY"] | spec.iconOffsetY;
+
+  if (spec.subtitleFontId == 0) spec.subtitleFontId = SMALL_FONT_ID;
+  if (spec.valueFontId == 0) spec.valueFontId = spec.fontId;
 }
+
+void parseButtonHintsSpec(JsonObjectConst obj, ThemeButtonHintsSpec& spec) {
+  if (obj.isNull()) return;
+  spec.enabled = true;
+  applyFontSpec(obj, spec.fontId, spec.bold);
+  spec.buttonWidth = obj["buttonWidth"] | spec.buttonWidth;
+  spec.smallButtonHeight = obj["smallButtonHeight"] | spec.smallButtonHeight;
+  spec.cornerRadius = obj["cornerRadius"] | spec.cornerRadius;
+  spec.fill = obj["fill"] | spec.fill;
+  spec.outline = obj["outline"] | spec.outline;
+  spec.drawEmpty = obj["drawEmpty"] | spec.drawEmpty;
+  spec.textOffsetY = obj["textOffsetY"] | spec.textOffsetY;
+  if (spec.fontId == 0) spec.fontId = SMALL_FONT_ID;
+}
+
+bool iconForKey(const char* key, UIIcon& out) {
+  if (key == nullptr) return false;
+  if (strcmp(key, "folder") == 0 || strcmp(key, "folder24") == 0) out = UIIcon::Folder;
+  else if (strcmp(key, "text") == 0 || strcmp(key, "text24") == 0) out = UIIcon::Text;
+  else if (strcmp(key, "image") == 0 || strcmp(key, "image24") == 0) out = UIIcon::Image;
+  else if (strcmp(key, "book") == 0 || strcmp(key, "book24") == 0) out = UIIcon::Book;
+  else if (strcmp(key, "file") == 0 || strcmp(key, "file24") == 0) out = UIIcon::File;
+  else if (strcmp(key, "recent") == 0) out = UIIcon::Recent;
+  else if (strcmp(key, "settings") == 0 || strcmp(key, "settings2") == 0) out = UIIcon::Settings;
+  else if (strcmp(key, "transfer") == 0) out = UIIcon::Transfer;
+  else if (strcmp(key, "library") == 0) out = UIIcon::Library;
+  else if (strcmp(key, "wifi") == 0) out = UIIcon::Wifi;
+  else if (strcmp(key, "hotspot") == 0) out = UIIcon::Hotspot;
+  else if (strcmp(key, "bookmark") == 0) out = UIIcon::Bookmark;
+  else return false;
+  return true;
+}
+
+void parseIconMap(JsonObjectConst obj, ThemeIconMap& icons) {
+  if (obj.isNull()) return;
+  for (JsonPairConst kv : obj) {
+    UIIcon icon = UIIcon::None;
+    const char* path = kv.value().as<const char*>();
+    if (iconForKey(kv.key().c_str(), icon) && path != nullptr && ThemeInstaller::isValidRelativePath(path)) {
+      if (strstr(kv.key().c_str(), "24") != nullptr && icons.find(icon) != icons.end()) continue;
+      icons[icon] = path;
+    }
+  }
+}
+
+ThemeMetrics defaultMetrics() { return LyraMetrics::values; }
 }  // namespace
 
 const char* SdCardThemeRegistry::activeDeviceId() { return gpio.deviceIsX3() ? "x3" : "x4"; }
@@ -277,33 +307,6 @@ bool SdCardThemeRegistry::isSafeId(const char* value) {
     if (!std::isalnum(static_cast<unsigned char>(c)) && c != '-' && c != '_' && c != ' ') return false;
   }
   return true;
-}
-
-SdThemeRendererHint SdCardThemeRegistry::rendererHintFor(const char* id, const char* componentModule) {
-  if (componentModule != nullptr && strcmp(componentModule, "carousel") == 0) return SdThemeRendererHint::Carousel;
-  if (id != nullptr) {
-    if (strcmp(id, "classic") == 0 || strcmp(id, "Classic") == 0) return SdThemeRendererHint::Lyra;
-    if (strcmp(id, "lyra-3-covers") == 0 || strcmp(id, "Lyra 3 Covers") == 0 || strcmp(id, "LYRA_3_COVERS") == 0) {
-      return SdThemeRendererHint::Lyra;
-    }
-    if (strcmp(id, "roundedraff") == 0 || strcmp(id, "RoundedRaff") == 0) return SdThemeRendererHint::Lyra;
-  }
-  return SdThemeRendererHint::Lyra;
-}
-
-SdThemeLayout SdCardThemeRegistry::layoutFor(const char* id, const char* componentModule, const char* layout) {
-  if (componentModule != nullptr && strcmp(componentModule, "carousel") == 0) return SdThemeLayout::Carousel;
-  if (layout != nullptr) {
-    if (strcmp(layout, "three-covers") == 0) return SdThemeLayout::ThreeCovers;
-    if (strcmp(layout, "roundedraff") == 0) return SdThemeLayout::RoundedRaff;
-    if (strcmp(layout, "carousel") == 0) return SdThemeLayout::Carousel;
-  }
-  if (id != nullptr) {
-    if (strcmp(id, "lyra-3-covers") == 0 || strcmp(id, "LYRA_3_COVERS") == 0) return SdThemeLayout::ThreeCovers;
-    if (strcmp(id, "roundedraff") == 0 || strcmp(id, "RoundedRaff") == 0) return SdThemeLayout::RoundedRaff;
-    if (strcmp(id, "carousel") == 0) return SdThemeLayout::Carousel;
-  }
-  return SdThemeLayout::Lyra;
 }
 
 bool SdCardThemeRegistry::parseThemeJson(const char* themeDirPath, SdCardThemeInfo& out) {
@@ -340,18 +343,12 @@ bool SdCardThemeRegistry::parseThemeJson(const char* themeDirPath, SdCardThemeIn
   JsonObject deviceObj = doc["devices"][deviceId].as<JsonObject>();
 
   const char* inherits = deviceObj["inherits"] | doc["inherits"] | "lyra";
-  const char* homeRecentsModule =
-      deviceObj["components"]["homeRecents"]["module"] | doc["components"]["homeRecents"]["module"] | nullptr;
-  const char* homeRecentsLayout =
-      deviceObj["components"]["homeRecents"]["layout"] | doc["components"]["homeRecents"]["layout"] | nullptr;
-
   out.id = id;
   out.name = name;
   out.path = themeDirPath;
   out.inherits = inherits;
   out.deviceId = deviceId;
-  out.layout = layoutFor(id, homeRecentsModule, homeRecentsLayout);
-  out.metrics = defaultMetricsFor(out.layout);
+  out.metrics = defaultMetrics();
   parseHomeRecentsSpec(doc["components"]["homeRecents"].as<JsonObjectConst>(), out.homeRecents);
   parseHomeRecentsSpec(deviceObj["components"]["homeRecents"].as<JsonObjectConst>(), out.homeRecents);
   if (out.homeRecents.type == ThemeHomeRecentsType::CoverStrip) {
@@ -359,6 +356,12 @@ bool SdCardThemeRegistry::parseThemeJson(const char* themeDirPath, SdCardThemeIn
   }
   parseButtonMenuSpec(doc["components"]["homeMenu"].as<JsonObjectConst>(), out.buttonMenu);
   parseButtonMenuSpec(deviceObj["components"]["homeMenu"].as<JsonObjectConst>(), out.buttonMenu);
+  parseListSpec(doc["components"]["list"].as<JsonObjectConst>(), out.list);
+  parseListSpec(deviceObj["components"]["list"].as<JsonObjectConst>(), out.list);
+  parseButtonHintsSpec(doc["components"]["buttonHints"].as<JsonObjectConst>(), out.buttonHints);
+  parseButtonHintsSpec(deviceObj["components"]["buttonHints"].as<JsonObjectConst>(), out.buttonHints);
+  parseIconMap(doc["assets"]["icons"].as<JsonObjectConst>(), out.icons);
+  parseIconMap(deviceObj["assets"]["icons"].as<JsonObjectConst>(), out.icons);
   applyMetricOverrides(doc["metrics"].as<JsonObjectConst>(), out.metrics);
   applyMetricOverrides(deviceObj["metrics"].as<JsonObjectConst>(), out.metrics);
   out.constraints.screenWidth = deviceObj["constraints"]["screenWidth"] | doc["constraints"]["screenWidth"] | 0;
@@ -366,7 +369,6 @@ bool SdCardThemeRegistry::parseThemeJson(const char* themeDirPath, SdCardThemeIn
   out.constraints.frontButtons = deviceObj["constraints"]["frontButtons"] | doc["constraints"]["frontButtons"] | 0;
   out.constraints.sideButtons =
       (deviceObj["constraints"]["sideButtons"] | doc["constraints"]["sideButtons"] | "");
-  out.rendererHint = rendererHintFor(id, homeRecentsModule);
   return true;
 }
 

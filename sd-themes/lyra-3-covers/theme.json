@@ -10,8 +10,6 @@
   },
   "components": {
     "homeRecents": {
-      "module": "lyra",
-      "layout": "three-covers",
       "type": "cover-strip",
       "maxBooks": 3,
       "wrap": false,
@@ -67,6 +65,44 @@
           }
         }
       ]
+    },
+    "homeMenu": {
+      "font": "ui12",
+      "style": "regular",
+      "centeredText": false,
+      "showIcons": true,
+      "drawPanel": false,
+      "selectionStyle": "fill",
+      "selectionCornerRadius": 6,
+      "selectionInset": 20
+    },
+    "list": {
+      "font": "ui10",
+      "style": "regular",
+      "showIcons": true,
+      "textGap": 8,
+      "selectionCornerRadius": 6,
+      "selectionFill": true,
+      "selectionOutline": false,
+      "selectedTextInverted": false,
+      "selectionInsetX": 0,
+      "selectionInsetY": 0,
+      "titleOffsetY": 7,
+      "subtitleOffsetY": 30,
+      "valueOffsetY": 6,
+      "subtitleValueOffsetY": 16,
+      "iconOffsetY": 10
+    },
+    "buttonHints": {
+      "font": "small",
+      "style": "regular",
+      "buttonWidth": 80,
+      "smallButtonHeight": 15,
+      "cornerRadius": 6,
+      "fill": true,
+      "outline": true,
+      "drawEmpty": true,
+      "textOffsetY": 7
     }
   },
   "assets": {

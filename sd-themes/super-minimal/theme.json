@@ -30,6 +30,34 @@
       "selectionStyle": "outline",
       "selectionCornerRadius": 6,
       "selectionInset": 18
+    },
+    "list": {
+      "font": "ui10",
+      "style": "regular",
+      "showIcons": true,
+      "textGap": 8,
+      "selectionCornerRadius": 6,
+      "selectionFill": true,
+      "selectionOutline": false,
+      "selectedTextInverted": false,
+      "selectionInsetX": 0,
+      "selectionInsetY": 0,
+      "titleOffsetY": 7,
+      "subtitleOffsetY": 30,
+      "valueOffsetY": 6,
+      "subtitleValueOffsetY": 16,
+      "iconOffsetY": 10
+    },
+    "buttonHints": {
+      "font": "small",
+      "style": "regular",
+      "buttonWidth": 80,
+      "smallButtonHeight": 15,
+      "cornerRadius": 6,
+      "fill": true,
+      "outline": true,
+      "drawEmpty": true,
+      "textOffsetY": 7
     }
   },
   "devices": {

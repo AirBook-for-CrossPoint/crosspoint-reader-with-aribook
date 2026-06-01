@@ -13,26 +13,6 @@
 
 UITheme UITheme::instance;
 
-namespace {
-struct SdThemeSelection {
-  LyraTheme::Variant variant = LyraTheme::Variant::Standard;
-};
-
-SdThemeSelection selectionFor(const SdCardThemeInfo& themeInfo) {
-  switch (themeInfo.layout) {
-    case SdThemeLayout::ThreeCovers:
-      return {LyraTheme::Variant::ThreeCovers};
-    case SdThemeLayout::RoundedRaff:
-      return {LyraTheme::Variant::RoundedRaff};
-    case SdThemeLayout::Carousel:
-      return {LyraTheme::Variant::Carousel};
-    case SdThemeLayout::Lyra:
-    default:
-      return {LyraTheme::Variant::Standard};
-  }
-}
-}  // namespace
-
 UITheme::UITheme() {
   auto themeType = static_cast<CrossPointSettings::UI_THEME>(SETTINGS.uiTheme);
   setTheme(themeType);
@@ -52,15 +32,21 @@ void UITheme::reload() {
       return;
     }
 
-    const SdThemeSelection selection = selectionFor(*themeInfo);
     LOG_DBG("UI", "Using SD theme: %s", themeInfo->id.c_str());
     currentSdMetrics = themeInfo->metrics;
     currentSdHomeRecents = themeInfo->homeRecents;
     currentSdButtonMenu = themeInfo->buttonMenu;
+    currentSdList = themeInfo->list;
+    currentSdButtonHints = themeInfo->buttonHints;
+    currentSdThemePath = themeInfo->path;
+    currentSdIcons = themeInfo->icons;
     const ThemeHomeRecentsSpec* homeRecents =
         currentSdHomeRecents.type != ThemeHomeRecentsType::Default ? &currentSdHomeRecents : nullptr;
     const ThemeButtonMenuSpec* buttonMenu = currentSdButtonMenu.enabled ? &currentSdButtonMenu : nullptr;
-    currentTheme = std::make_unique<LyraTheme>(selection.variant, &currentSdMetrics, homeRecents, buttonMenu);
+    const ThemeListSpec* list = currentSdList.enabled ? &currentSdList : nullptr;
+    const ThemeButtonHintsSpec* buttonHints = currentSdButtonHints.enabled ? &currentSdButtonHints : nullptr;
+    currentTheme = std::make_unique<LyraTheme>(&currentSdMetrics, homeRecents, buttonMenu, list, buttonHints,
+                                               currentSdThemePath.c_str(), &currentSdIcons);
     currentMetrics = &currentSdMetrics;
     return;
   }

@@ -39,6 +39,10 @@ class UITheme {
   ThemeMetrics currentSdMetrics;
   ThemeHomeRecentsSpec currentSdHomeRecents;
   ThemeButtonMenuSpec currentSdButtonMenu;
+  ThemeListSpec currentSdList;
+  ThemeButtonHintsSpec currentSdButtonHints;
+  std::string currentSdThemePath;
+  ThemeIconMap currentSdIcons;
   std::unique_ptr<BaseTheme> currentTheme;
   SdCardThemeRegistry themeRegistry;
 };

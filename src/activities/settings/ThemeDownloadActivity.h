@@ -10,7 +10,7 @@
 #define THEMES_MANIFEST_VERSION 1
 
 #ifndef THEME_MANIFEST_URL
-#define THEME_MANIFEST_URL "https://crosspointreader.com/themes/themes.json"
+#define THEME_MANIFEST_URL "http://crosspointreader.com/themes/themes.json"
 #endif
 
 class ThemeDownloadActivity : public Activity {
