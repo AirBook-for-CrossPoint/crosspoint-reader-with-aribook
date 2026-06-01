@@ -6,15 +6,14 @@
   "inherits": "lyra",
   "metrics": {
     "headerHeight": 64,
-    "homeTopPadding": 88,
+    "homeTopPadding": 64,
     "homeCoverHeight": 0,
     "homeCoverTileHeight": 0,
     "homeRecentBooksCount": 1,
     "homeContinueReadingInMenu": true,
-    "homeMenuTopOffset": 12,
+    "homeMenuTopOffset": 0,
     "menuRowHeight": 42,
-    "menuSpacing": 6,
-    "contentSidePadding": 32
+    "menuSpacing": 6
   },
   "components": {
     "homeRecents": {
@@ -24,29 +23,13 @@
       "font": "ui10",
       "style": "regular",
       "centeredText": true,
+      "centerVertically": true,
       "showIcons": false,
       "drawPanel": false,
       "panelWidth": 360,
       "selectionStyle": "outline",
       "selectionCornerRadius": 6,
       "selectionInset": 18
-    },
-    "list": {
-      "font": "ui10",
-      "style": "regular",
-      "showIcons": true,
-      "textGap": 8,
-      "selectionCornerRadius": 6,
-      "selectionFill": true,
-      "selectionOutline": false,
-      "selectedTextInverted": false,
-      "selectionInsetX": 0,
-      "selectionInsetY": 0,
-      "titleOffsetY": 7,
-      "subtitleOffsetY": 30,
-      "valueOffsetY": 6,
-      "subtitleValueOffsetY": 16,
-      "iconOffsetY": 10
     },
     "buttonHints": {
       "font": "small",

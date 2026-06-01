@@ -139,6 +139,7 @@ struct ThemeButtonMenuSpec {
   int fontId = 12;
   bool bold = false;
   bool centeredText = false;
+  bool centerVertically = false;
   bool showIcons = true;
   int panelWidth = 0;
   bool drawPanel = false;

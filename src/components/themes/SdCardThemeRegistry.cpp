@@ -206,6 +206,7 @@ void parseButtonMenuSpec(JsonObjectConst obj, ThemeButtonMenuSpec& spec) {
   spec.enabled = true;
   applyFontSpec(obj, spec.fontId, spec.bold);
   spec.centeredText = obj["centeredText"] | spec.centeredText;
+  spec.centerVertically = obj["centerVertically"] | spec.centerVertically;
   spec.showIcons = obj["showIcons"] | spec.showIcons;
   spec.panelWidth = obj["panelWidth"] | spec.panelWidth;
   spec.drawPanel = obj["drawPanel"] | spec.drawPanel;
@@ -351,9 +352,6 @@ bool SdCardThemeRegistry::parseThemeJson(const char* themeDirPath, SdCardThemeIn
   out.metrics = defaultMetrics();
   parseHomeRecentsSpec(doc["components"]["homeRecents"].as<JsonObjectConst>(), out.homeRecents);
   parseHomeRecentsSpec(deviceObj["components"]["homeRecents"].as<JsonObjectConst>(), out.homeRecents);
-  if (out.homeRecents.type == ThemeHomeRecentsType::CoverStrip) {
-    out.metrics.homeRecentBooksCount = std::max(1, out.homeRecents.maxBooks);
-  }
   parseButtonMenuSpec(doc["components"]["homeMenu"].as<JsonObjectConst>(), out.buttonMenu);
   parseButtonMenuSpec(deviceObj["components"]["homeMenu"].as<JsonObjectConst>(), out.buttonMenu);
   parseListSpec(doc["components"]["list"].as<JsonObjectConst>(), out.list);
@@ -364,6 +362,9 @@ bool SdCardThemeRegistry::parseThemeJson(const char* themeDirPath, SdCardThemeIn
   parseIconMap(deviceObj["assets"]["icons"].as<JsonObjectConst>(), out.icons);
   applyMetricOverrides(doc["metrics"].as<JsonObjectConst>(), out.metrics);
   applyMetricOverrides(deviceObj["metrics"].as<JsonObjectConst>(), out.metrics);
+  if (out.homeRecents.type == ThemeHomeRecentsType::CoverStrip) {
+    out.metrics.homeRecentBooksCount = std::max(1, out.homeRecents.maxBooks);
+  }
   out.constraints.screenWidth = deviceObj["constraints"]["screenWidth"] | doc["constraints"]["screenWidth"] | 0;
   out.constraints.screenHeight = deviceObj["constraints"]["screenHeight"] | doc["constraints"]["screenHeight"] | 0;
   out.constraints.frontButtons = deviceObj["constraints"]["frontButtons"] | doc["constraints"]["frontButtons"] | 0;

@@ -163,8 +163,10 @@ void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* t
 
   if (title) {
     auto truncatedTitle = renderer.truncatedText(UI_12_FONT_ID, title, maxTitleWidth, EpdFontFamily::BOLD);
-    renderer.drawText(UI_12_FONT_ID, rect.x + metrics().contentSidePadding,
-                      rect.y + metrics().batteryBarHeight + 3, truncatedTitle.c_str(), true,
+    const int titleLineHeight = renderer.getLineHeight(UI_12_FONT_ID);
+    const int titleY = std::min(rect.y + metrics().batteryBarHeight + 3,
+                                rect.y + std::max(0, rect.height - titleLineHeight - 6));
+    renderer.drawText(UI_12_FONT_ID, rect.x + metrics().contentSidePadding, titleY, truncatedTitle.c_str(), true,
                       EpdFontFamily::BOLD);
     renderer.drawLine(rect.x, rect.y + rect.height - 3, rect.x + rect.width - 1, rect.y + rect.height - 3, 3, true);
   }
@@ -172,9 +174,12 @@ void LyraTheme::drawHeader(const GfxRenderer& renderer, Rect rect, const char* t
   if (subtitle) {
     auto truncatedSubtitle = renderer.truncatedText(SMALL_FONT_ID, subtitle, maxSubtitleWidth, EpdFontFamily::REGULAR);
     int truncatedSubtitleWidth = renderer.getTextWidth(SMALL_FONT_ID, truncatedSubtitle.c_str());
+    const int subtitleLineHeight = renderer.getLineHeight(SMALL_FONT_ID);
+    const int subtitleY =
+        std::min(rect.y + 50, rect.y + std::max(0, rect.height - subtitleLineHeight - 6));
     renderer.drawText(SMALL_FONT_ID,
                       rect.x + rect.width - metrics().contentSidePadding - truncatedSubtitleWidth,
-                      rect.y + 50, truncatedSubtitle.c_str(), true);
+                      subtitleY, truncatedSubtitle.c_str(), true);
   }
 }
 
@@ -788,14 +793,16 @@ void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount
     const int panelWidth = spec.panelWidth > 0 ? std::min(spec.panelWidth, rect.width) : rect.width;
     const int panelX = rect.x + (rect.width - panelWidth) / 2;
     const int panelHeight = buttonCount * m.menuRowHeight + std::max(0, buttonCount - 1) * m.menuSpacing;
+    const int panelY = spec.centerVertically && panelHeight < rect.height ? rect.y + (rect.height - panelHeight) / 2
+                                                                           : rect.y;
 
     if (spec.drawPanel) {
-      renderer.drawRoundedRect(panelX, rect.y, panelWidth, panelHeight, 1, spec.panelCornerRadius, true);
+      renderer.drawRoundedRect(panelX, panelY, panelWidth, panelHeight, 1, spec.panelCornerRadius, true);
     }
 
     for (int i = 0; i < buttonCount; ++i) {
       Rect tileRect = Rect{panelX + spec.selectionInset,
-                           rect.y + i * (m.menuRowHeight + m.menuSpacing),
+                           panelY + i * (m.menuRowHeight + m.menuSpacing),
                            panelWidth - spec.selectionInset * 2, m.menuRowHeight};
       const bool selected = selectedIndex == i;
 

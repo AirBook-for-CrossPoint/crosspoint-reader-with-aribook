@@ -32,7 +32,9 @@ void UITheme::reload() {
       return;
     }
 
-    LOG_DBG("UI", "Using SD theme: %s", themeInfo->id.c_str());
+    LOG_DBG("UI", "Using SD theme: %s recentsType=%d count=%d slots=%d", themeInfo->id.c_str(),
+            static_cast<int>(themeInfo->homeRecents.type), themeInfo->metrics.homeRecentBooksCount,
+            static_cast<int>(themeInfo->homeRecents.slots.size()));
     currentSdMetrics = themeInfo->metrics;
     currentSdHomeRecents = themeInfo->homeRecents;
     currentSdButtonMenu = themeInfo->buttonMenu;
