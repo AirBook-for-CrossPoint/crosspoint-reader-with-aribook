@@ -28,8 +28,8 @@ constexpr int HTTP_TX_BUF = 1024;
 constexpr int HTTP_TIMEOUT_MS = 60000;
 constexpr size_t READ_CHUNK = 2048;
 constexpr size_t FALLBACK_READ_CHUNK = 1024;
-constexpr uint32_t PROGRESS_INTERVAL_MS = 500;
-constexpr size_t MIN_PROGRESS_STEP_BYTES = 16 * 1024;
+constexpr uint32_t PROGRESS_INTERVAL_MS = 1500;
+constexpr size_t MIN_PROGRESS_STEP_BYTES = 64 * 1024;
 
 struct Sink {
   std::function<bool(const uint8_t*, size_t)> write;  // returns false to abort the transfer
@@ -114,6 +114,19 @@ std::string buildRedirectUrl(const std::string& baseUrl, const std::string& loca
 // large/slow files and surfaces a short read directly.
 HttpDownloader::DownloadError runGet(const std::string& url, const std::string& username, const std::string& password,
                                      Sink& sink) {
+  size_t readChunk = READ_CHUNK;
+  auto buf = makeUniqueNoThrow<char[]>(readChunk);
+  if (!buf) {
+    readChunk = FALLBACK_READ_CHUNK;
+    buf = makeUniqueNoThrow<char[]>(readChunk);
+    if (!buf) {
+      LOG_ERR("HTTP", "OOM: %u byte read buffer", (unsigned)readChunk);
+      return HttpDownloader::HTTP_ERROR;
+    }
+    LOG_DBG("HTTP", "Using fallback %u byte read buffer (free=%u max=%u)", (unsigned)readChunk,
+            (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap());
+  }
+
   std::string currentUrl = url;
   ParsedUrl credentialOrigin;
   const bool hasCredentials = !username.empty() && !password.empty() && parseUrl(url, credentialOrigin);
@@ -194,18 +207,6 @@ HttpDownloader::DownloadError runGet(const std::string& url, const std::string& 
     sink.total = contentLength > 0 ? static_cast<size_t>(contentLength) : 0;
     size_t lastProgressBytes = 0;
     uint32_t lastProgressMs = millis();
-
-    size_t readChunk = READ_CHUNK;
-    auto buf = makeUniqueNoThrow<char[]>(readChunk);
-    if (!buf) {
-      readChunk = FALLBACK_READ_CHUNK;
-      buf = makeUniqueNoThrow<char[]>(readChunk);
-      if (!buf) {
-        LOG_ERR("HTTP", "OOM: %u byte read buffer", (unsigned)readChunk);
-        esp_http_client_cleanup(client);
-        return HttpDownloader::HTTP_ERROR;
-      }
-    }
 
     while (true) {
       if (sink.cancelFlag && *sink.cancelFlag) {
