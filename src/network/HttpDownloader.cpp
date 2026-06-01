@@ -8,13 +8,13 @@
 #include <base64.h>
 #include <esp_crt_bundle.h>
 #include <esp_http_client.h>
+#include <strings.h>
 
 #include <algorithm>
 #include <cstdlib>
 #include <cstring>
 #include <functional>
 #include <string>
-#include <strings.h>
 
 namespace {
 // RX holds the response headers. 4096 fits real OPDS servers; GitHub's release
@@ -59,7 +59,8 @@ bool parseUrl(const std::string& url, ParsedUrl& out) {
 
   const size_t hostStart = schemeEnd + 3;
   const size_t pathStart = url.find('/', hostStart);
-  const std::string hostPort = url.substr(hostStart, pathStart == std::string::npos ? std::string::npos : pathStart - hostStart);
+  const std::string hostPort =
+      url.substr(hostStart, pathStart == std::string::npos ? std::string::npos : pathStart - hostStart);
   out.path = pathStart == std::string::npos ? "/" : url.substr(pathStart);
   out.port = out.https ? 443 : 80;
 
@@ -172,7 +173,8 @@ HttpDownloader::DownloadError runGetWithMinimalClient(const std::string& url, Si
         contentLength = static_cast<size_t>(atol(headerValue(line).c_str()));
       } else if (headerStartsWith(line, "Location")) {
         location = headerValue(line);
-      } else if (headerStartsWith(line, "Transfer-Encoding") && headerValue(line).find("chunked") != std::string::npos) {
+      } else if (headerStartsWith(line, "Transfer-Encoding") &&
+                 headerValue(line).find("chunked") != std::string::npos) {
         chunked = true;
       }
     }

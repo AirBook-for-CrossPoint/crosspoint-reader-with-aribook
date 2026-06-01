@@ -73,11 +73,10 @@ constexpr ThemeMetrics values = {.batteryWidth = 16,
 class LyraTheme : public BaseTheme {
  public:
   explicit LyraTheme(const ThemeMetrics* metrics = &LyraMetrics::values,
-                     const ThemeHomeRecentsSpec* homeRecents = nullptr,
-                     const ThemeButtonMenuSpec* buttonMenu = nullptr, const ThemeListSpec* list = nullptr,
-                     const ThemeButtonHintsSpec* buttonHints = nullptr, const ThemeTabBarSpec* tabBar = nullptr,
-                     const ThemeHeaderSpec* header = nullptr, const char* assetRoot = nullptr,
-                     const ThemeIconMap* icons = nullptr)
+                     const ThemeHomeRecentsSpec* homeRecents = nullptr, const ThemeButtonMenuSpec* buttonMenu = nullptr,
+                     const ThemeListSpec* list = nullptr, const ThemeButtonHintsSpec* buttonHints = nullptr,
+                     const ThemeTabBarSpec* tabBar = nullptr, const ThemeHeaderSpec* header = nullptr,
+                     const char* assetRoot = nullptr, const ThemeIconMap* icons = nullptr)
       : metrics_(metrics),
         homeRecents_(homeRecents),
         buttonMenu_(buttonMenu),

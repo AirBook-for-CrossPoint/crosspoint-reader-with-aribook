@@ -69,9 +69,8 @@ void SettingsActivity::rebuildSettingsLists() {
   systemSettings.push_back(SettingInfo::Action(StrId::STR_CHECK_UPDATES, SettingAction::CheckForUpdates));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_SD_FIRMWARE_UPDATE, SettingAction::SdFirmwareUpdate));
   systemSettings.push_back(SettingInfo::Action(StrId::STR_LANGUAGE, SettingAction::Language));
-  auto themeSettingIt =
-      std::find_if(displaySettings.begin(), displaySettings.end(),
-                   [](const SettingInfo& setting) { return setting.nameId == StrId::STR_UI_THEME; });
+  auto themeSettingIt = std::find_if(displaySettings.begin(), displaySettings.end(),
+                                     [](const SettingInfo& setting) { return setting.nameId == StrId::STR_UI_THEME; });
   displaySettings.insert(themeSettingIt == displaySettings.end() ? displaySettings.end() : themeSettingIt + 1,
                          SettingInfo::Action(StrId::STR_MANAGE_THEMES, SettingAction::DownloadThemes));
   // Insert "Manage Fonts" right after the font family setting so users discover it naturally

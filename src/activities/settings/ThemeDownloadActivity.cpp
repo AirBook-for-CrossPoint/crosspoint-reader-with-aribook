@@ -135,8 +135,8 @@ bool ThemeDownloadActivity::fetchAndParseManifest() {
       file.path = fileObj["path"] | fileObj["name"] | "";
       file.url = fileObj["url"] | file.path;
       file.size = fileObj["size"] | 0;
-      if (!ThemeInstaller::isValidRelativePath(file.path.c_str()) || !ThemeInstaller::isValidRelativePath(file.url.c_str()) ||
-          !fileObj["crc32"].is<uint32_t>()) {
+      if (!ThemeInstaller::isValidRelativePath(file.path.c_str()) ||
+          !ThemeInstaller::isValidRelativePath(file.url.c_str()) || !fileObj["crc32"].is<uint32_t>()) {
         errorMessage_ = "Invalid theme manifest";
         return false;
       }
@@ -325,7 +325,8 @@ void ThemeDownloadActivity::downloadTheme(ManifestTheme& theme) {
     }
 
     uint32_t actualCrc = 0;
-    if (!computeFileCrc32(destPath, actualCrc) || actualCrc != file.crc32 || !themeInstaller_.validateThemeFile(destPath)) {
+    if (!computeFileCrc32(destPath, actualCrc) || actualCrc != file.crc32 ||
+        !themeInstaller_.validateThemeFile(destPath)) {
       themeInstaller_.deleteTheme(theme.id.c_str());
       theme.installed = false;
       theme.hasUpdate = false;
@@ -505,8 +506,10 @@ void ThemeDownloadActivity::render(RenderLock&&) {
           Rect{0, contentTop, pageWidth, pageHeight - contentTop - metrics.buttonHintsHeight - metrics.verticalSpacing},
           listItemCount(), selectedIndex_,
           [this](int index) -> std::string {
-            if (isDownloadAllRow(index)) return std::string(tr(STR_DOWNLOAD_ALL)) + " (" + formatSize(totalDownloadSize()) + ")";
-            if (isUpdateAllRow(index)) return std::string(tr(STR_UPDATE_ALL)) + " (" + formatSize(totalUpdateSize()) + ")";
+            if (isDownloadAllRow(index))
+              return std::string(tr(STR_DOWNLOAD_ALL)) + " (" + formatSize(totalDownloadSize()) + ")";
+            if (isUpdateAllRow(index))
+              return std::string(tr(STR_UPDATE_ALL)) + " (" + formatSize(totalUpdateSize()) + ")";
             return themes_[themeIndexFromList(index)].name;
           },
           [this](int index) -> std::string {
@@ -529,7 +532,7 @@ void ThemeDownloadActivity::render(RenderLock&&) {
           });
 
       const auto labels = mappedInput.mapLabels(tr(STR_BACK),
-                                                isSelectedThemeDeletable()     ? tr(STR_DELETE)
+                                                isSelectedThemeDeletable()       ? tr(STR_DELETE)
                                                 : isUpdateAllRow(selectedIndex_) ? tr(STR_UPDATE)
                                                                                  : tr(STR_DOWNLOAD),
                                                 tr(STR_DIR_UP), tr(STR_DIR_DOWN));
@@ -543,11 +546,10 @@ void ThemeDownloadActivity::render(RenderLock&&) {
 
     float progress = 0;
     if (fileTotal_ > 0) progress = static_cast<float>(fileProgress_) / static_cast<float>(fileTotal_);
-    GUI.drawProgressBar(
-        renderer,
-        Rect{metrics.contentSidePadding, centerY + metrics.verticalSpacing, pageWidth - metrics.contentSidePadding * 2,
-             metrics.progressBarHeight},
-        static_cast<int>(progress * 100), 100);
+    GUI.drawProgressBar(renderer,
+                        Rect{metrics.contentSidePadding, centerY + metrics.verticalSpacing,
+                             pageWidth - metrics.contentSidePadding * 2, metrics.progressBarHeight},
+                        static_cast<int>(progress * 100), 100);
 
     const auto labels = mappedInput.mapLabels(tr(STR_CANCEL), "", "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
@@ -558,7 +560,8 @@ void ThemeDownloadActivity::render(RenderLock&&) {
   } else if (state_ == ERROR) {
     renderer.drawCenteredText(UI_10_FONT_ID, centerY - lineHeight, tr(STR_THEME_INSTALL_FAILED), true,
                               EpdFontFamily::BOLD);
-    if (!errorMessage_.empty()) renderer.drawCenteredText(UI_10_FONT_ID, centerY + metrics.verticalSpacing, errorMessage_.c_str());
+    if (!errorMessage_.empty())
+      renderer.drawCenteredText(UI_10_FONT_ID, centerY + metrics.verticalSpacing, errorMessage_.c_str());
     const auto labels = mappedInput.mapLabels(tr(STR_BACK), tr(STR_RETRY), "", "");
     GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
   }

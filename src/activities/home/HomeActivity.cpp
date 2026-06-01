@@ -167,7 +167,8 @@ bool HomeActivity::storeCoverBuffer() {
     return false;
   }
   coverBufferSize = needed;
-  if (!renderer.copyRegionToBuffer(coverRectX, coverRectY, coverRectW, coverRectH, coverBuffer.get(), coverBufferSize)) {
+  if (!renderer.copyRegionToBuffer(coverRectX, coverRectY, coverRectW, coverRectH, coverBuffer.get(),
+                                   coverBufferSize)) {
     coverBuffer.reset();
     coverBufferSize = 0;
     return false;
@@ -179,7 +180,8 @@ bool HomeActivity::storeCoverBuffer() {
 
 bool HomeActivity::restoreCoverBuffer() {
   if (!coverBuffer || coverRectW <= 0 || coverRectH <= 0) return false;
-  return renderer.copyBufferToRegion(coverRectX, coverRectY, coverRectW, coverRectH, coverBuffer.get(), coverBufferSize);
+  return renderer.copyBufferToRegion(coverRectX, coverRectY, coverRectW, coverRectH, coverBuffer.get(),
+                                     coverBufferSize);
 }
 
 void HomeActivity::freeCoverBuffer() {
@@ -265,11 +267,10 @@ void HomeActivity::render(RenderLock&&) {
 
   const bool selectorSensitiveCoverCache = GUI.homeCoverCacheDependsOnSelector();
   const bool coverStripSelected = selectorIndex < static_cast<int>(recentBooks.size());
-  bool bufferRestored =
-      hasCoverArea && coverBufferStored &&
-      (!selectorSensitiveCoverCache ||
-       (coverBufferSelectorIndex == coverSelectorIndex && coverBufferStripSelected == coverStripSelected)) &&
-      restoreCoverBuffer();
+  bool bufferRestored = hasCoverArea && coverBufferStored &&
+                        (!selectorSensitiveCoverCache || (coverBufferSelectorIndex == coverSelectorIndex &&
+                                                          coverBufferStripSelected == coverStripSelected)) &&
+                        restoreCoverBuffer();
 
   if (hasCoverArea) {
     GUI.drawRecentBookCover(renderer, Rect{0, metrics.homeTopPadding, pageWidth, metrics.homeCoverTileHeight},

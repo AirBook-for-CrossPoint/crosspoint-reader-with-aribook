@@ -7,8 +7,8 @@
 #include <vector>
 
 #include "CrossPointSettings.h"
-#include "components/themes/SdCardThemeRegistry.h"
 #include "components/themes/BaseTheme.h"
+#include "components/themes/SdCardThemeRegistry.h"
 
 class UITheme {
   // Static instance

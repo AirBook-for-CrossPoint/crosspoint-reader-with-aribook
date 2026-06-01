@@ -971,9 +971,8 @@ void EpubReaderActivity::renderContents(std::unique_ptr<Page> page, const int or
       // [#2190] Headroom probe: tiled scratch is ~8 KB here; the full-frame
       // alternative would need ~52 KB total (chunked at 8 KB). Compare free vs
       // ~52 KB and largest_block vs 8 KB to see if X3 could afford full-frame.
-      LOG_INF("ERS", "Grayscale heap @render: free=%u largest_block=%u scratch=%d",
-              (unsigned)ESP.getFreeHeap(), (unsigned)ESP.getMaxAllocHeap(),
-              gwBytes * STRIP_ROWS);
+      LOG_INF("ERS", "Grayscale heap @render: free=%u largest_block=%u scratch=%d", (unsigned)ESP.getFreeHeap(),
+              (unsigned)ESP.getMaxAllocHeap(), gwBytes * STRIP_ROWS);
       // Bands may be streamed in any order: X4 windows each via setRamArea, X3
       // via PTL.
       renderer.setRenderMode(GfxRenderer::GRAYSCALE_LSB);

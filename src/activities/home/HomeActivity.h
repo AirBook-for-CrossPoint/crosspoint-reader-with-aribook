@@ -18,10 +18,10 @@ class HomeActivity final : public Activity {
   bool recentsLoaded = false;
   bool firstRenderDone = false;
   bool hasOpdsServers = false;
-  bool coverRendered = false;      // Track if cover has been rendered once
-  bool coverBufferStored = false;  // Track if cover buffer is stored
+  bool coverRendered = false;              // Track if cover has been rendered once
+  bool coverBufferStored = false;          // Track if cover buffer is stored
   std::unique_ptr<uint8_t[]> coverBuffer;  // HomeActivity's own buffer for cover image
-  size_t coverBufferSize = 0;      // Bytes allocated to coverBuffer
+  size_t coverBufferSize = 0;              // Bytes allocated to coverBuffer
   int coverBufferSelectorIndex = -1;
   bool coverBufferStripSelected = false;
   // Logical rect last passed to drawRecentBookCover. The cover snapshot only

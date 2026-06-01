@@ -9,9 +9,9 @@
 #include <cctype>
 #include <cstring>
 
+#include "ThemeInstaller.h"
 #include "components/themes/lyra/LyraTheme.h"
 #include "fontIds.h"
-#include "ThemeInstaller.h"
 
 namespace {
 constexpr int THEME_SCHEMA_VERSION = 1;
@@ -352,19 +352,32 @@ void parseHeaderSpec(JsonObjectConst obj, ThemeHeaderSpec& spec) {
 
 bool iconForKey(const char* key, UIIcon& out) {
   if (key == nullptr) return false;
-  if (strcmp(key, "folder") == 0 || strcmp(key, "folder24") == 0) out = UIIcon::Folder;
-  else if (strcmp(key, "text") == 0 || strcmp(key, "text24") == 0) out = UIIcon::Text;
-  else if (strcmp(key, "image") == 0 || strcmp(key, "image24") == 0) out = UIIcon::Image;
-  else if (strcmp(key, "book") == 0 || strcmp(key, "book24") == 0) out = UIIcon::Book;
-  else if (strcmp(key, "file") == 0 || strcmp(key, "file24") == 0) out = UIIcon::File;
-  else if (strcmp(key, "recent") == 0) out = UIIcon::Recent;
-  else if (strcmp(key, "settings") == 0 || strcmp(key, "settings2") == 0) out = UIIcon::Settings;
-  else if (strcmp(key, "transfer") == 0) out = UIIcon::Transfer;
-  else if (strcmp(key, "library") == 0) out = UIIcon::Library;
-  else if (strcmp(key, "wifi") == 0) out = UIIcon::Wifi;
-  else if (strcmp(key, "hotspot") == 0) out = UIIcon::Hotspot;
-  else if (strcmp(key, "bookmark") == 0) out = UIIcon::Bookmark;
-  else return false;
+  if (strcmp(key, "folder") == 0 || strcmp(key, "folder24") == 0)
+    out = UIIcon::Folder;
+  else if (strcmp(key, "text") == 0 || strcmp(key, "text24") == 0)
+    out = UIIcon::Text;
+  else if (strcmp(key, "image") == 0 || strcmp(key, "image24") == 0)
+    out = UIIcon::Image;
+  else if (strcmp(key, "book") == 0 || strcmp(key, "book24") == 0)
+    out = UIIcon::Book;
+  else if (strcmp(key, "file") == 0 || strcmp(key, "file24") == 0)
+    out = UIIcon::File;
+  else if (strcmp(key, "recent") == 0)
+    out = UIIcon::Recent;
+  else if (strcmp(key, "settings") == 0 || strcmp(key, "settings2") == 0)
+    out = UIIcon::Settings;
+  else if (strcmp(key, "transfer") == 0)
+    out = UIIcon::Transfer;
+  else if (strcmp(key, "library") == 0)
+    out = UIIcon::Library;
+  else if (strcmp(key, "wifi") == 0)
+    out = UIIcon::Wifi;
+  else if (strcmp(key, "hotspot") == 0)
+    out = UIIcon::Hotspot;
+  else if (strcmp(key, "bookmark") == 0)
+    out = UIIcon::Bookmark;
+  else
+    return false;
   return true;
 }
 
@@ -462,8 +475,7 @@ bool SdCardThemeRegistry::parseThemeJson(const char* themeDirPath, SdCardThemeIn
   out.constraints.screenWidth = deviceObj["constraints"]["screenWidth"] | doc["constraints"]["screenWidth"] | 0;
   out.constraints.screenHeight = deviceObj["constraints"]["screenHeight"] | doc["constraints"]["screenHeight"] | 0;
   out.constraints.frontButtons = deviceObj["constraints"]["frontButtons"] | doc["constraints"]["frontButtons"] | 0;
-  out.constraints.sideButtons =
-      (deviceObj["constraints"]["sideButtons"] | doc["constraints"]["sideButtons"] | "");
+  out.constraints.sideButtons = (deviceObj["constraints"]["sideButtons"] | doc["constraints"]["sideButtons"] | "");
   return true;
 }
 
@@ -536,9 +548,8 @@ void SdCardThemeRegistry::clear() {
 }
 
 const SdCardThemeInfo* SdCardThemeRegistry::findTheme(const std::string& id) const {
-  auto it = std::find_if(themes_.begin(), themes_.end(), [&](const SdCardThemeInfo& theme) {
-    return theme.id == id || theme.name == id;
-  });
+  auto it = std::find_if(themes_.begin(), themes_.end(),
+                         [&](const SdCardThemeInfo& theme) { return theme.id == id || theme.name == id; });
   return it == themes_.end() ? nullptr : &*it;
 }
 
