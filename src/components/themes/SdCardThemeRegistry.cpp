@@ -166,6 +166,9 @@ void parseHomeRecentsSpec(JsonObjectConst obj, ThemeHomeRecentsSpec& spec) {
 
   JsonArrayConst slots = obj["slots"].as<JsonArrayConst>();
   if (!slots.isNull()) {
+    if (spec.type == ThemeHomeRecentsType::Default) {
+      spec.type = ThemeHomeRecentsType::CoverStrip;
+    }
     spec.slots.clear();
     for (JsonObjectConst slotObj : slots) {
       if (spec.slots.size() >= 5) break;
