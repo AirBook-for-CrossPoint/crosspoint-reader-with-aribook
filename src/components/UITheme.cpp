@@ -24,15 +24,9 @@ UITheme::UITheme() {
 void UITheme::refreshRegistry() { themeRegistry.discover(); }
 
 void UITheme::releaseSdThemeAssetMemory() {
+  // Keep active SD theme backing storage intact; currentTheme may hold pointers
+  // into it. This only releases discovered theme metadata that can be rebuilt.
   themeRegistry.clear();
-  currentSdIcons.clear();
-  currentSdHomeRecents = ThemeHomeRecentsSpec{};
-  currentSdHomeRecents.slots.shrink_to_fit();
-  currentSdButtonMenu = ThemeButtonMenuSpec{};
-  currentSdList = ThemeListSpec{};
-  currentSdButtonHints = ThemeButtonHintsSpec{};
-  currentSdTabBar = ThemeTabBarSpec{};
-  currentSdHeader = ThemeHeaderSpec{};
 }
 
 std::vector<int> UITheme::getHomeCoverThumbHeights() const {
@@ -105,6 +99,39 @@ void UITheme::reload() {
 }
 
 void UITheme::setTheme(CrossPointSettings::UI_THEME type) {
+  std::unique_ptr<BaseTheme> nextTheme;
+  const ThemeMetrics* nextMetrics = &LyraMetrics::values;
+
+  switch (type) {
+    case CrossPointSettings::UI_THEME::CLASSIC:
+      LOG_DBG("UI", "Using Classic theme");
+      nextTheme = std::make_unique<BaseTheme>();
+      nextMetrics = &BaseMetrics::values;
+      break;
+    case CrossPointSettings::UI_THEME::LYRA:
+      LOG_DBG("UI", "Using Lyra theme");
+      nextTheme = std::make_unique<LyraTheme>();
+      nextMetrics = &LyraMetrics::values;
+      break;
+    case CrossPointSettings::UI_THEME::ROUNDEDRAFF:
+      LOG_DBG("UI", "Using RoundedRaff theme");
+      nextTheme = std::make_unique<RoundedRaffTheme>();
+      nextMetrics = &RoundedRaffMetrics::values;
+      break;
+    case CrossPointSettings::UI_THEME::LYRA_3_COVERS:
+      LOG_DBG("UI", "Using Lyra 3 Covers theme");
+      nextTheme = std::make_unique<Lyra3CoversTheme>();
+      nextMetrics = &Lyra3CoversMetrics::values;
+      break;
+    default:
+      LOG_DBG("UI", "Using Lyra theme");
+      nextTheme = std::make_unique<LyraTheme>();
+      nextMetrics = &LyraMetrics::values;
+      break;
+  }
+
+  currentTheme = std::move(nextTheme);
+  currentMetrics = nextMetrics;
   currentSdMetrics = ThemeMetrics{};
   currentSdHomeRecents = ThemeHomeRecentsSpec{};
   currentSdButtonMenu = ThemeButtonMenuSpec{};
@@ -115,34 +142,6 @@ void UITheme::setTheme(CrossPointSettings::UI_THEME type) {
   currentSdThemePath.clear();
   currentSdIcons.clear();
   themeRegistry.clear();
-
-  switch (type) {
-    case CrossPointSettings::UI_THEME::CLASSIC:
-      LOG_DBG("UI", "Using Classic theme");
-      currentTheme = std::make_unique<BaseTheme>();
-      currentMetrics = &BaseMetrics::values;
-      break;
-    case CrossPointSettings::UI_THEME::LYRA:
-      LOG_DBG("UI", "Using Lyra theme");
-      currentTheme = std::make_unique<LyraTheme>();
-      currentMetrics = &LyraMetrics::values;
-      break;
-    case CrossPointSettings::UI_THEME::ROUNDEDRAFF:
-      LOG_DBG("UI", "Using RoundedRaff theme");
-      currentTheme = std::make_unique<RoundedRaffTheme>();
-      currentMetrics = &RoundedRaffMetrics::values;
-      break;
-    case CrossPointSettings::UI_THEME::LYRA_3_COVERS:
-      LOG_DBG("UI", "Using Lyra 3 Covers theme");
-      currentTheme = std::make_unique<Lyra3CoversTheme>();
-      currentMetrics = &Lyra3CoversMetrics::values;
-      break;
-    default:
-      LOG_DBG("UI", "Using Lyra theme");
-      currentTheme = std::make_unique<LyraTheme>();
-      currentMetrics = &LyraMetrics::values;
-      break;
-  }
 }
 
 int UITheme::getNumberOfItemsPerPage(const GfxRenderer& renderer, bool hasHeader, bool hasTabBar, bool hasButtonHints,

@@ -9,12 +9,14 @@
 #include <cctype>
 #include <cstring>
 
+#include "CrossPointSettings.h"
 #include "ThemeInstaller.h"
 #include "components/themes/lyra/LyraTheme.h"
 #include "fontIds.h"
 
 namespace {
 constexpr int THEME_SCHEMA_VERSION = 1;
+constexpr size_t MAX_PERSISTED_THEME_ID_LENGTH = sizeof(SETTINGS.sdThemeName) - 1;
 
 void applyMetricOverrides(JsonObjectConst obj, ThemeMetrics& metrics) {
   if (obj.isNull()) return;
@@ -410,6 +412,7 @@ bool SdCardThemeRegistry::isSafeId(const char* value) {
 
 bool SdCardThemeRegistry::isSafeThemeId(const char* value) {
   if (value == nullptr || value[0] == '\0') return false;
+  if (strlen(value) > MAX_PERSISTED_THEME_ID_LENGTH) return false;
   if (strstr(value, "..") != nullptr || strchr(value, '/') != nullptr || strchr(value, '\\') != nullptr) return false;
   for (const char* p = value; *p != '\0'; ++p) {
     const char c = *p;

@@ -141,6 +141,8 @@ inline SettingInfo buildUiThemeSetting(const SdCardThemeRegistry* registry) {
     if (sdIdx < static_cast<int>(sdThemeIds.size())) {
       strncpy(SETTINGS.sdThemeName, sdThemeIds[sdIdx].c_str(), sizeof(SETTINGS.sdThemeName) - 1);
       SETTINGS.sdThemeName[sizeof(SETTINGS.sdThemeName) - 1] = '\0';
+    } else {
+      SETTINGS.sdThemeName[0] = '\0';
     }
   };
 
