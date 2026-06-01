@@ -763,46 +763,52 @@ void LyraTheme::drawSideButtonHints(const GfxRenderer& renderer, const char* top
   const int buttonWidth = metrics().sideButtonHintsWidth;  // Width on screen (height when rotated)
   constexpr int buttonHeight = 78;                         // Height on screen (width when rotated)
   constexpr int buttonMargin = 0;
+  const int buttonCornerRadius =
+      buttonHints_ != nullptr && buttonHints_->enabled ? buttonHints_->cornerRadius : cornerRadius;
+  const int fontId = buttonHints_ != nullptr && buttonHints_->enabled ? buttonHints_->fontId : SMALL_FONT_ID;
+  const auto style = buttonHints_ != nullptr && buttonHints_->enabled && buttonHints_->bold ? EpdFontFamily::BOLD
+                                                                                            : EpdFontFamily::REGULAR;
+  const ThemeButtonHintsStyle hintStyle =
+      buttonHints_ != nullptr && buttonHints_->enabled ? buttonHints_->style : ThemeButtonHintsStyle::Buttons;
+  const bool shapes = hintStyle == ThemeButtonHintsStyle::Shapes;
+  const int shapeSize = buttonHints_ != nullptr && buttonHints_->enabled ? buttonHints_->shapeSize : 18;
+
+  auto drawSideHint = [&](const int x, const int y, const char* label, const bool leftOpen, const bool rightOpen) {
+    if (label == nullptr || label[0] == '\0') return;
+
+    if (shapes) {
+      drawButtonHintShape(renderer, shapeForButtonHintLabel(label), x + buttonWidth / 2, y + buttonHeight / 2,
+                          shapeSize);
+      return;
+    }
+
+    if (buttonHints_ == nullptr || !buttonHints_->enabled || buttonHints_->fill) {
+      renderer.fillRoundedRect(x, y, buttonWidth, buttonHeight, buttonCornerRadius, Color::White);
+    }
+    if (buttonHints_ == nullptr || !buttonHints_->enabled || buttonHints_->outline) {
+      renderer.drawRoundedRect(x, y, buttonWidth, buttonHeight, 1, buttonCornerRadius, leftOpen, rightOpen, leftOpen,
+                               rightOpen, true);
+    }
+    const int textWidth = renderer.getTextWidth(fontId, label, style);
+    const int textHeight = renderer.getTextHeight(fontId);
+    const int textX = x + (buttonWidth - textHeight) / 2;
+    renderer.drawTextRotated90CW(fontId, textX, y + (buttonHeight + textWidth) / 2, label, true, style);
+  };
 
   if (gpio.deviceIsX3()) {
     // X3 layout: Up on left side, Down on right side, positioned higher
     constexpr int x3ButtonY = 155;
 
-    if (topBtn != nullptr && topBtn[0] != '\0') {
-      renderer.drawRoundedRect(buttonMargin, x3ButtonY, buttonWidth, buttonHeight, 1, cornerRadius, false, true, false,
-                               true, true);
-      const int textWidth = renderer.getTextWidth(SMALL_FONT_ID, topBtn);
-      renderer.drawTextRotated90CW(SMALL_FONT_ID, buttonMargin, x3ButtonY + (buttonHeight + textWidth) / 2, topBtn);
-    }
-
-    if (bottomBtn != nullptr && bottomBtn[0] != '\0') {
-      const int rightX = screenWidth - buttonWidth;
-      renderer.drawRoundedRect(rightX, x3ButtonY, buttonWidth, buttonHeight, 1, cornerRadius, true, false, true, false,
-                               true);
-      const int textWidth = renderer.getTextWidth(SMALL_FONT_ID, bottomBtn);
-      renderer.drawTextRotated90CW(SMALL_FONT_ID, rightX, x3ButtonY + (buttonHeight + textWidth) / 2, bottomBtn);
-    }
+    drawSideHint(buttonMargin, x3ButtonY, topBtn, false, true);
+    drawSideHint(screenWidth - buttonWidth, x3ButtonY, bottomBtn, true, false);
   } else {
     // X4 layout: Both buttons stacked on right side
     const char* labels[] = {topBtn, bottomBtn};
     const int x = screenWidth - buttonWidth;
 
-    if (topBtn != nullptr && topBtn[0] != '\0') {
-      renderer.drawRoundedRect(x, topHintButtonY, buttonWidth, buttonHeight, 1, cornerRadius, true, false, true, false,
-                               true);
-    }
-
-    if (bottomBtn != nullptr && bottomBtn[0] != '\0') {
-      renderer.drawRoundedRect(x, topHintButtonY + buttonHeight + 5, buttonWidth, buttonHeight, 1, cornerRadius, true,
-                               false, true, false, true);
-    }
-
     for (int i = 0; i < 2; i++) {
-      if (labels[i] != nullptr && labels[i][0] != '\0') {
-        const int y = topHintButtonY + (i * buttonHeight) + 5;
-        const int textWidth = renderer.getTextWidth(SMALL_FONT_ID, labels[i]);
-        renderer.drawTextRotated90CW(SMALL_FONT_ID, x, y + (buttonHeight + textWidth) / 2, labels[i]);
-      }
+      const int y = topHintButtonY + (i * buttonHeight) + 5;
+      drawSideHint(x, y, labels[i], true, false);
     }
   }
 }
