@@ -53,6 +53,11 @@ void SettingsActivity::rebuildSettingsLists() {
       systemSettings.push_back(setting);
     }
   }
+  // getSettingsList copies the SD theme names/ids into the UI theme setting.
+  // Keeping the full parsed SD theme registry alive while child activities
+  // like the font downloader run leaves less contiguous heap for TLS/header
+  // parsing.
+  UITheme::getInstance().registry().clear();
 
   // Append device-only ACTION items
   controlsSettings.insert(controlsSettings.begin(),
