@@ -7,6 +7,7 @@
 #include <I18n.h>
 
 #include <algorithm>
+#include <cmath>
 #include <cstdint>
 #include <string>
 #include <vector>
@@ -190,7 +191,17 @@ bool LyraTheme::drawThemeIcon(const GfxRenderer& renderer, UIIcon icon, int x, i
   if (!Storage.openFileForRead("THEME", path.c_str(), file)) return false;
   Bitmap bitmap(file);
   if (bitmap.parseHeaders() != BmpReaderError::Ok) return false;
-  renderer.drawBitmap(bitmap, x, y, size, size);
+
+  float scale = 1.0f;
+  if (bitmap.getWidth() > size) {
+    scale = std::min(scale, static_cast<float>(size) / static_cast<float>(bitmap.getWidth()));
+  }
+  if (bitmap.getHeight() > size) {
+    scale = std::min(scale, static_cast<float>(size) / static_cast<float>(bitmap.getHeight()));
+  }
+  const int drawnWidth = std::max(1, static_cast<int>(std::floor(bitmap.getWidth() * scale)));
+  const int drawnHeight = std::max(1, static_cast<int>(std::floor(bitmap.getHeight() * scale)));
+  renderer.drawBitmap(bitmap, x + (size - drawnWidth) / 2, y + (size - drawnHeight) / 2, size, size);
   return true;
 }
 
