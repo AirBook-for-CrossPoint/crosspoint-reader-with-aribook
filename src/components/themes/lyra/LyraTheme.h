@@ -74,8 +74,9 @@ class LyraTheme : public BaseTheme {
   enum class Variant { Standard, ThreeCovers, RoundedRaff, Carousel };
 
   explicit LyraTheme(Variant variant = Variant::Standard, const ThemeMetrics* metrics = &LyraMetrics::values,
-                     const ThemeHomeRecentsSpec* homeRecents = nullptr)
-      : variant_(variant), metrics_(metrics), homeRecents_(homeRecents) {}
+                     const ThemeHomeRecentsSpec* homeRecents = nullptr,
+                     const ThemeButtonMenuSpec* buttonMenu = nullptr)
+      : variant_(variant), metrics_(metrics), homeRecents_(homeRecents), buttonMenu_(buttonMenu) {}
 
   // Component drawing methods
   void fillBatteryIcon(const GfxRenderer& renderer, Rect rect, uint16_t percentage) const override;
@@ -106,6 +107,7 @@ class LyraTheme : public BaseTheme {
   Variant variant_;
   const ThemeMetrics* metrics_;
   const ThemeHomeRecentsSpec* homeRecents_;
+  const ThemeButtonMenuSpec* buttonMenu_;
   const ThemeMetrics& metrics() const { return metrics_ ? *metrics_ : LyraMetrics::values; }
   void drawThreeCoverRecents(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,
                              int selectorIndex, bool& coverRendered, bool& coverBufferStored,

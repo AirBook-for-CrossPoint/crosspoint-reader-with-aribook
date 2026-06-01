@@ -150,8 +150,12 @@ void parseCoverSlot(JsonObjectConst obj, ThemeCoverSlotSpec& slot) {
 void parseHomeRecentsSpec(JsonObjectConst obj, ThemeHomeRecentsSpec& spec) {
   if (obj.isNull()) return;
   const char* type = obj["type"] | nullptr;
-  if (type != nullptr && strcmp(type, "cover-strip") == 0) {
-    spec.type = ThemeHomeRecentsType::CoverStrip;
+  if (type != nullptr) {
+    if (strcmp(type, "cover-strip") == 0) {
+      spec.type = ThemeHomeRecentsType::CoverStrip;
+    } else if (strcmp(type, "none") == 0) {
+      spec.type = ThemeHomeRecentsType::None;
+    }
   }
   spec.maxBooks = obj["maxBooks"] | spec.maxBooks;
   spec.wrap = obj["wrap"] | spec.wrap;
@@ -166,6 +170,56 @@ void parseHomeRecentsSpec(JsonObjectConst obj, ThemeHomeRecentsSpec& spec) {
       ThemeCoverSlotSpec slot;
       parseCoverSlot(slotObj, slot);
       spec.slots.push_back(slot);
+    }
+  }
+}
+
+void applyFontSpec(JsonObjectConst obj, int& fontId, bool& bold) {
+  const char* font = obj["font"] | nullptr;
+  if (font != nullptr) {
+    if (strcmp(font, "ui10") == 0) {
+      fontId = UI_10_FONT_ID;
+    } else if (strcmp(font, "small") == 0) {
+      fontId = SMALL_FONT_ID;
+    } else {
+      fontId = UI_12_FONT_ID;
+    }
+  } else {
+    fontId = obj["fontId"] | fontId;
+    if (fontId == 10) {
+      fontId = UI_10_FONT_ID;
+    } else if (fontId == 12) {
+      fontId = UI_12_FONT_ID;
+    }
+  }
+
+  bold = obj["bold"] | bold;
+  const char* style = obj["style"] | nullptr;
+  if (style != nullptr) {
+    bold = strcmp(style, "bold") == 0;
+  }
+}
+
+void parseButtonMenuSpec(JsonObjectConst obj, ThemeButtonMenuSpec& spec) {
+  if (obj.isNull()) return;
+  spec.enabled = true;
+  applyFontSpec(obj, spec.fontId, spec.bold);
+  spec.centeredText = obj["centeredText"] | spec.centeredText;
+  spec.showIcons = obj["showIcons"] | spec.showIcons;
+  spec.panelWidth = obj["panelWidth"] | spec.panelWidth;
+  spec.drawPanel = obj["drawPanel"] | spec.drawPanel;
+  spec.panelCornerRadius = obj["panelCornerRadius"] | spec.panelCornerRadius;
+  spec.selectionCornerRadius = obj["selectionCornerRadius"] | spec.selectionCornerRadius;
+  spec.selectionInset = obj["selectionInset"] | spec.selectionInset;
+
+  const char* selectionStyle = obj["selectionStyle"] | nullptr;
+  if (selectionStyle != nullptr) {
+    if (strcmp(selectionStyle, "outline") == 0) {
+      spec.selectionStyle = ThemeMenuSelectionStyle::Outline;
+    } else if (strcmp(selectionStyle, "triangle") == 0) {
+      spec.selectionStyle = ThemeMenuSelectionStyle::Triangle;
+    } else {
+      spec.selectionStyle = ThemeMenuSelectionStyle::Fill;
     }
   }
 }
@@ -303,6 +357,8 @@ bool SdCardThemeRegistry::parseThemeJson(const char* themeDirPath, SdCardThemeIn
   if (out.homeRecents.type == ThemeHomeRecentsType::CoverStrip) {
     out.metrics.homeRecentBooksCount = std::max(1, out.homeRecents.maxBooks);
   }
+  parseButtonMenuSpec(doc["components"]["homeMenu"].as<JsonObjectConst>(), out.buttonMenu);
+  parseButtonMenuSpec(deviceObj["components"]["homeMenu"].as<JsonObjectConst>(), out.buttonMenu);
   applyMetricOverrides(doc["metrics"].as<JsonObjectConst>(), out.metrics);
   applyMetricOverrides(deviceObj["metrics"].as<JsonObjectConst>(), out.metrics);
   out.constraints.screenWidth = deviceObj["constraints"]["screenWidth"] | doc["constraints"]["screenWidth"] | 0;

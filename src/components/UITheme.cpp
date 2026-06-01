@@ -56,9 +56,11 @@ void UITheme::reload() {
     LOG_DBG("UI", "Using SD theme: %s", themeInfo->id.c_str());
     currentSdMetrics = themeInfo->metrics;
     currentSdHomeRecents = themeInfo->homeRecents;
+    currentSdButtonMenu = themeInfo->buttonMenu;
     const ThemeHomeRecentsSpec* homeRecents =
-        currentSdHomeRecents.type == ThemeHomeRecentsType::CoverStrip ? &currentSdHomeRecents : nullptr;
-    currentTheme = std::make_unique<LyraTheme>(selection.variant, &currentSdMetrics, homeRecents);
+        currentSdHomeRecents.type != ThemeHomeRecentsType::Default ? &currentSdHomeRecents : nullptr;
+    const ThemeButtonMenuSpec* buttonMenu = currentSdButtonMenu.enabled ? &currentSdButtonMenu : nullptr;
+    currentTheme = std::make_unique<LyraTheme>(selection.variant, &currentSdMetrics, homeRecents, buttonMenu);
     currentMetrics = &currentSdMetrics;
     return;
   }

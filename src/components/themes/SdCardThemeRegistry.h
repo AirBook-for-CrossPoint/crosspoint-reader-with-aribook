@@ -24,6 +24,7 @@ struct SdCardThemeInfo {
   SdThemeLayout layout = SdThemeLayout::Lyra;
   ThemeMetrics metrics = {};
   ThemeHomeRecentsSpec homeRecents;
+  ThemeButtonMenuSpec buttonMenu;
   SdThemeDeviceConstraints constraints;
   SdThemeRendererHint rendererHint = SdThemeRendererHint::Lyra;
 };

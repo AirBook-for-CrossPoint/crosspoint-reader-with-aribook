@@ -414,6 +414,12 @@ void LyraTheme::drawRecentBookCover(GfxRenderer& renderer, Rect rect, const std:
     bufferRestored = false;
     return;
   }
+  if (homeRecents_ != nullptr && homeRecents_->type == ThemeHomeRecentsType::None) {
+    coverBufferStored = false;
+    coverRendered = false;
+    bufferRestored = false;
+    return;
+  }
 
   if (variant_ == Variant::ThreeCovers) {
     drawThreeCoverRecents(renderer, rect, recentBooks, selectorIndex, coverRendered, coverBufferStored,
@@ -644,16 +650,24 @@ void LyraTheme::drawCoverStripRecents(GfxRenderer& renderer, Rect rect, const st
   auto drawCover = [&](int bookIndex, int x, int y, int w, int h, bool selectedCover) {
     bool hasCover = bookIndex >= 0 && bookIndex < bookCount && !recentBooks[bookIndex].coverBmpPath.empty();
     if (hasCover) {
-      const std::string coverBmpPath = UITheme::getCoverThumbPath(recentBooks[bookIndex].coverBmpPath, h);
-      HalFile file;
-      if (Storage.openFileForRead("HOME", coverBmpPath, file)) {
+      auto drawThumb = [&](int thumbHeight) {
+        const std::string coverBmpPath = UITheme::getCoverThumbPath(recentBooks[bookIndex].coverBmpPath, thumbHeight);
+        HalFile file;
+        if (!Storage.openFileForRead("HOME", coverBmpPath, file)) return false;
         Bitmap bitmap(file);
         if (bitmap.parseHeaders() == BmpReaderError::Ok) {
           renderer.drawBitmap(bitmap, x, y, w, h);
+          return true;
         } else {
-          hasCover = false;
+          return false;
         }
-      } else {
+      };
+
+      bool drawn = drawThumb(h);
+      if (!drawn && h != m.homeCoverHeight) {
+        drawn = drawThumb(m.homeCoverHeight);
+      }
+      if (!drawn) {
         hasCover = false;
       }
     }
@@ -798,6 +812,67 @@ void LyraTheme::drawEmptyRecents(const GfxRenderer& renderer, const Rect rect) c
 void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount, int selectedIndex,
                                const std::function<std::string(int index)>& buttonLabel,
                                const std::function<UIIcon(int index)>& rowIcon) const {
+  if (buttonMenu_ != nullptr && buttonMenu_->enabled) {
+    const auto& spec = *buttonMenu_;
+    const auto& m = metrics();
+    const int panelWidth = spec.panelWidth > 0 ? std::min(spec.panelWidth, rect.width) : rect.width;
+    const int panelX = rect.x + (rect.width - panelWidth) / 2;
+    const int panelHeight = buttonCount * m.menuRowHeight + std::max(0, buttonCount - 1) * m.menuSpacing;
+
+    if (spec.drawPanel) {
+      renderer.drawRoundedRect(panelX, rect.y, panelWidth, panelHeight, 1, spec.panelCornerRadius, true);
+    }
+
+    for (int i = 0; i < buttonCount; ++i) {
+      Rect tileRect = Rect{panelX + spec.selectionInset,
+                           rect.y + i * (m.menuRowHeight + m.menuSpacing),
+                           panelWidth - spec.selectionInset * 2, m.menuRowHeight};
+      const bool selected = selectedIndex == i;
+
+      if (selected) {
+        if (spec.selectionStyle == ThemeMenuSelectionStyle::Outline) {
+          renderer.drawRoundedRect(tileRect.x, tileRect.y, tileRect.width, tileRect.height, 1,
+                                   spec.selectionCornerRadius, true);
+        } else if (spec.selectionStyle == ThemeMenuSelectionStyle::Triangle) {
+          constexpr int triangleWidth = 12;
+          constexpr int triangleHeight = 18;
+          const int triangleX = panelX + spec.selectionInset;
+          const int triangleCenterY = tileRect.y + tileRect.height / 2;
+          const int triangleXPoints[3] = {triangleX, triangleX, triangleX + triangleWidth};
+          const int triangleYPoints[3] = {triangleCenterY - triangleHeight / 2,
+                                          triangleCenterY + triangleHeight / 2, triangleCenterY};
+          renderer.fillPolygon(triangleXPoints, triangleYPoints, 3, true);
+        } else {
+          renderer.fillRoundedRect(tileRect.x, tileRect.y, tileRect.width, tileRect.height,
+                                   spec.selectionCornerRadius, Color::LightGray);
+        }
+      }
+
+      std::string labelStr = buttonLabel(i);
+      const char* label = labelStr.c_str();
+      const auto style = spec.bold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR;
+      const int lineHeight = renderer.getLineHeight(spec.fontId);
+      const int textY = tileRect.y + (tileRect.height - lineHeight) / 2;
+      int textX = tileRect.x + 16;
+
+      if (spec.showIcons && rowIcon != nullptr) {
+        UIIcon icon = rowIcon(i);
+        const uint8_t* iconBitmap = iconForName(icon, mainMenuIconSize);
+        if (iconBitmap != nullptr) {
+          renderer.drawIcon(iconBitmap, textX, textY + 3, mainMenuIconSize, mainMenuIconSize);
+          textX += mainMenuIconSize + hPaddingInSelection + 2;
+        }
+      }
+
+      if (spec.centeredText) {
+        const int textWidth = renderer.getTextWidth(spec.fontId, label, style);
+        textX = tileRect.x + (tileRect.width - textWidth) / 2;
+      }
+      renderer.drawText(spec.fontId, textX, textY, label, true, style);
+    }
+    return;
+  }
+
   for (int i = 0; i < buttonCount; ++i) {
     int tileWidth = rect.width - metrics().contentSidePadding * 2;
     Rect tileRect = Rect{rect.x + metrics().contentSidePadding,

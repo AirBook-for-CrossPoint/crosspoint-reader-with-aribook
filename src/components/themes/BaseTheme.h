@@ -97,10 +97,11 @@ struct ThemeMetrics {
   int textFieldLineEndOffset;
 };
 
-enum class ThemeHomeRecentsType { Default, CoverStrip };
+enum class ThemeHomeRecentsType { Default, None, CoverStrip };
 enum class ThemeBookRef { Previous, Selected, Next, Index };
 enum class ThemeSlotX { Padding, Center, RightPadding };
 enum class ThemeSlotY { Top, Center };
+enum class ThemeMenuSelectionStyle { Fill, Outline, Triangle };
 
 struct ThemeTitleSpec {
   bool enabled = false;
@@ -130,6 +131,20 @@ struct ThemeHomeRecentsSpec {
   int selectionLineWidth = 3;
   int selectionCornerRadius = 6;
   std::vector<ThemeCoverSlotSpec> slots;
+};
+
+struct ThemeButtonMenuSpec {
+  bool enabled = false;
+  int fontId = 12;
+  bool bold = false;
+  bool centeredText = false;
+  bool showIcons = true;
+  int panelWidth = 0;
+  bool drawPanel = false;
+  int panelCornerRadius = 3;
+  ThemeMenuSelectionStyle selectionStyle = ThemeMenuSelectionStyle::Fill;
+  int selectionCornerRadius = 6;
+  int selectionInset = 16;
 };
 
 enum UIIcon { None = 0, Folder, Text, Image, Book, File, Recent, Settings, Transfer, Library, Wifi, Hotspot, Bookmark };
