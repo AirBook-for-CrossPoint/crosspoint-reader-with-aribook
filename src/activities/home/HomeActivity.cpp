@@ -133,6 +133,7 @@ void HomeActivity::onEnter() {
 
   const auto base = static_cast<int>(recentBooks.size());
   selectorIndex = initialMenuItem == HomeMenuItem::NONE ? 0 : base + menuItemToIndex(initialMenuItem, hasOpdsServers);
+  coverSelectorIndex = recentBooks.empty() ? 0 : std::min(selectorIndex, static_cast<int>(recentBooks.size()) - 1);
 
   // Trigger first update
   requestUpdate();
@@ -164,7 +165,7 @@ bool HomeActivity::storeCoverBuffer() {
     coverBufferSize = 0;
     return false;
   }
-  coverBufferSelectorIndex = selectorIndex;
+  coverBufferSelectorIndex = coverSelectorIndex;
   return true;
 }
 
@@ -188,11 +189,17 @@ void HomeActivity::loop() {
 
   buttonNavigator.onNext([this, menuCount] {
     selectorIndex = ButtonNavigator::nextIndex(selectorIndex, menuCount);
+    if (selectorIndex < static_cast<int>(recentBooks.size())) {
+      coverSelectorIndex = selectorIndex;
+    }
     requestUpdate();
   });
 
   buttonNavigator.onPrevious([this, menuCount] {
     selectorIndex = ButtonNavigator::previousIndex(selectorIndex, menuCount);
+    if (selectorIndex < static_cast<int>(recentBooks.size())) {
+      coverSelectorIndex = selectorIndex;
+    }
     requestUpdate();
   });
 
@@ -232,12 +239,12 @@ void HomeActivity::render(RenderLock&&) {
   renderer.clearScreen();
   const bool selectorSensitiveCoverCache = GUI.homeCoverCacheDependsOnSelector();
   bool bufferRestored =
-      coverBufferStored && (!selectorSensitiveCoverCache || coverBufferSelectorIndex == selectorIndex) &&
+      coverBufferStored && (!selectorSensitiveCoverCache || coverBufferSelectorIndex == coverSelectorIndex) &&
       restoreCoverBuffer();
 
   GUI.drawHeader(renderer, Rect{0, metrics.topPadding, pageWidth, metrics.homeTopPadding},
                  metrics.homeContinueReadingInMenu && metrics.homeShowContinueReadingHeader && !recentBooks.empty()
-                     ? recentBooks[0].title.c_str()
+                     ? recentBooks[std::min(coverSelectorIndex, static_cast<int>(recentBooks.size()) - 1)].title.c_str()
                      : nullptr);
 
   // Record the tile rect so storeCoverBuffer (called from the theme) knows
@@ -250,7 +257,7 @@ void HomeActivity::render(RenderLock&&) {
 
   if (metrics.homeCoverTileHeight > 0 && metrics.homeCoverHeight > 0) {
     GUI.drawRecentBookCover(renderer, Rect{0, metrics.homeTopPadding, pageWidth, metrics.homeCoverTileHeight},
-                            recentBooks, selectorIndex, coverRendered, coverBufferStored, bufferRestored,
+                            recentBooks, coverSelectorIndex, coverRendered, coverBufferStored, bufferRestored,
                             std::bind(&HomeActivity::storeCoverBuffer, this));
   } else {
     coverRendered = false;

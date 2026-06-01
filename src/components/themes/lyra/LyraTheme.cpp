@@ -101,7 +101,7 @@ ButtonHintShape shapeForButtonHintLabel(const char* label) {
   }
   if (matchesLabel(label, tr(STR_SELECT)) || matchesLabel(label, tr(STR_CONFIRM)) ||
       matchesLabel(label, tr(STR_OK_BUTTON)) || matchesLabel(label, tr(STR_DONE)) ||
-      matchesLabel(label, tr(STR_OPEN))) {
+      matchesLabel(label, tr(STR_OPEN)) || matchesLabel(label, tr(STR_TOGGLE))) {
     return ButtonHintShape::Select;
   }
   if (matchesLabel(label, tr(STR_DIR_UP))) return ButtonHintShape::Up;
