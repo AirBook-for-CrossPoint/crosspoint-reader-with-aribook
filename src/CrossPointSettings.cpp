@@ -194,17 +194,7 @@ bool CrossPointSettings::loadFromBinaryFile() {
     if (++settingsRead >= fileSettingsCount) break;
     readAndValidate(inputFile, sideButtonLayout, SIDE_BUTTON_LAYOUT_COUNT);
     if (++settingsRead >= fileSettingsCount) break;
-    {
-      uint8_t legacyFontFamily;
-      serialization::readPod(inputFile, legacyFontFamily);
-      if (legacyFontFamily < BUILTIN_FONT_COUNT) {
-        fontFamily = legacyFontFamily;
-      } else if (legacyFontFamily == LEGACY_OPENDYSLEXIC) {
-        fontFamily = NOTOSERIF;
-        strncpy(sdFontFamilyName, "OpenDyslexic", sizeof(sdFontFamilyName) - 1);
-        sdFontFamilyName[sizeof(sdFontFamilyName) - 1] = '\0';
-      }
-    }
+    readAndValidate(inputFile, fontFamily, FONT_FAMILY_COUNT);
     if (++settingsRead >= fileSettingsCount) break;
     readAndValidate(inputFile, fontSize, FONT_SIZE_COUNT);
     if (++settingsRead >= fileSettingsCount) break;
@@ -322,6 +312,16 @@ float CrossPointSettings::getReaderLineCompression() const {
         case WIDE:
           return 1.0f;
       }
+    case OPENDYSLEXIC:
+      switch (lineSpacing) {
+        case TIGHT:
+          return 0.90f;
+        case NORMAL:
+        default:
+          return 0.95f;
+        case WIDE:
+          return 1.0f;
+      }
   }
 }
 
@@ -381,6 +381,18 @@ int CrossPointSettings::getReaderFontId() const {
           return NOTOSANS_16_FONT_ID;
         case EXTRA_LARGE:
           return NOTOSANS_18_FONT_ID;
+      }
+    case OPENDYSLEXIC:
+      switch (fontSize) {
+        case SMALL:
+          return OPENDYSLEXIC_8_FONT_ID;
+        case MEDIUM:
+        default:
+          return OPENDYSLEXIC_10_FONT_ID;
+        case LARGE:
+          return OPENDYSLEXIC_12_FONT_ID;
+        case EXTRA_LARGE:
+          return OPENDYSLEXIC_14_FONT_ID;
       }
   }
 }
