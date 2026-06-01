@@ -80,7 +80,7 @@
       "subtitleOffsetY": 30,
       "valueOffsetY": 6,
       "subtitleValueOffsetY": 16,
-      "iconOffsetY": 10
+      "iconOffsetY": 0
     },
     "buttonHints": {
       "font": "small",

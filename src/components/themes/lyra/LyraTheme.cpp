@@ -405,12 +405,13 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
 
       if (rowIcon != nullptr && spec.showIcons) {
         const UIIcon icon = rowIcon(i);
+        const int iconY = itemY + (rowHeight - iconSize) / 2 + spec.iconOffsetY;
         if (!drawThemeIcon(renderer, icon, rect.x + metrics().contentSidePadding + hPaddingInSelection,
-                           itemY + spec.iconOffsetY, iconSize)) {
+                           iconY, iconSize)) {
           const uint8_t* iconBitmap = iconForName(icon, iconSize);
           if (iconBitmap != nullptr) {
             renderer.drawIcon(iconBitmap, rect.x + metrics().contentSidePadding + hPaddingInSelection,
-                              itemY + spec.iconOffsetY, iconSize, iconSize);
+                              iconY, iconSize, iconSize);
           }
         }
       }
@@ -474,7 +475,6 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
 
   // Draw all items
   const auto pageStartIndex = selectedIndex / pageItems * pageItems;
-  int iconY = (rowSubtitle != nullptr) ? 16 : 10;
   for (int i = pageStartIndex; i < itemCount && i < pageStartIndex + pageItems; i++) {
     const int itemY = rect.y + (i % pageItems) * rowHeight;
     int rowTextWidth = textWidth;
@@ -504,12 +504,12 @@ void LyraTheme::drawList(const GfxRenderer& renderer, Rect rect, int itemCount, 
 
     if (rowIcon != nullptr) {
       UIIcon icon = rowIcon(i);
-      if (!drawThemeIcon(renderer, icon, rect.x + metrics().contentSidePadding + hPaddingInSelection, itemY + iconY,
-                         iconSize)) {
+      const int iconY = itemY + (rowHeight - iconSize) / 2;
+      if (!drawThemeIcon(renderer, icon, rect.x + metrics().contentSidePadding + hPaddingInSelection, iconY, iconSize)) {
         const uint8_t* iconBitmap = iconForName(icon, iconSize);
         if (iconBitmap != nullptr) {
           renderer.drawIcon(iconBitmap, rect.x + metrics().contentSidePadding + hPaddingInSelection,
-                            itemY + iconY, iconSize, iconSize);
+                            iconY, iconSize, iconSize);
         }
       }
     }
@@ -929,10 +929,11 @@ void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount
 
       if (spec.showIcons && rowIcon != nullptr) {
         UIIcon icon = rowIcon(i);
-        if (!drawThemeIcon(renderer, icon, textX, textY + 3, mainMenuIconSize)) {
+        const int iconY = tileRect.y + (tileRect.height - mainMenuIconSize) / 2;
+        if (!drawThemeIcon(renderer, icon, textX, iconY, mainMenuIconSize)) {
           const uint8_t* iconBitmap = iconForName(icon, mainMenuIconSize);
           if (iconBitmap != nullptr) {
-            renderer.drawIcon(iconBitmap, textX, textY + 3, mainMenuIconSize, mainMenuIconSize);
+            renderer.drawIcon(iconBitmap, textX, iconY, mainMenuIconSize, mainMenuIconSize);
           }
         }
         if (hasThemeIcon(icon) || iconForName(icon, mainMenuIconSize) != nullptr) {
@@ -974,10 +975,11 @@ void LyraTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount
 
     if (rowIcon != nullptr) {
       UIIcon icon = rowIcon(i);
-      if (!drawThemeIcon(renderer, icon, textX, textY + 3, mainMenuIconSize)) {
+      const int iconY = tileRect.y + (tileRect.height - mainMenuIconSize) / 2;
+      if (!drawThemeIcon(renderer, icon, textX, iconY, mainMenuIconSize)) {
         const uint8_t* iconBitmap = iconForName(icon, mainMenuIconSize);
         if (iconBitmap != nullptr) {
-          renderer.drawIcon(iconBitmap, textX, textY + 3, mainMenuIconSize, mainMenuIconSize);
+          renderer.drawIcon(iconBitmap, textX, iconY, mainMenuIconSize, mainMenuIconSize);
         }
       }
       if (hasThemeIcon(icon) || iconForName(icon, mainMenuIconSize) != nullptr) {
