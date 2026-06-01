@@ -24,6 +24,9 @@ void UITheme::refreshRegistry() { themeRegistry.discover(); }
 void UITheme::releaseSdThemeAssetMemory() {
   themeRegistry.clear();
   currentSdIcons.clear();
+  currentSdHomeRecents.slots.clear();
+  currentSdHomeRecents.slots.shrink_to_fit();
+  currentSdHomeRecents.type = ThemeHomeRecentsType::Default;
 }
 
 std::vector<int> UITheme::getHomeCoverThumbHeights() const {
