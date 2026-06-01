@@ -317,7 +317,7 @@ HttpDownloader::DownloadError HttpDownloader::downloadToFile(const std::string& 
   }
   const uint32_t elapsedMs = millis() - startMs;
   const uint32_t bytesPerSec = elapsedMs > 0 ? static_cast<uint32_t>((sink.downloaded * 1000ULL) / elapsedMs) : 0;
-  LOG_DBG("HTTP", "Downloaded %zu bytes in %lu ms (%lu B/s)", sink.downloaded,
-          static_cast<unsigned long>(elapsedMs), static_cast<unsigned long>(bytesPerSec));
+  LOG_DBG("HTTP", "Downloaded %zu bytes in %lu ms (%lu B/s)", sink.downloaded, static_cast<unsigned long>(elapsedMs),
+          static_cast<unsigned long>(bytesPerSec));
   return OK;
 }
