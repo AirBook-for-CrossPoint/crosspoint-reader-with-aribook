@@ -140,6 +140,14 @@ class SdCardFont {
 
     // Full intervals loaded from file (kept in RAM for codepoint lookup)
     EpdUnicodeInterval* fullIntervals = nullptr;
+    struct BmpInterval16 {
+      uint16_t first;
+      uint16_t last;
+      uint16_t offset;
+    } __attribute__((packed));
+    static_assert(sizeof(BmpInterval16) == 6, "BmpInterval16 must remain compact");
+    BmpInterval16* bmpIntervals = nullptr;
+    bool intervalsAreBmp16 = false;
 
     // Persistent kern-class + ligature tables (lazy-loaded on first prewarm).
     // The full kern MATRIX is NOT resident — on Literata-class fonts a single
