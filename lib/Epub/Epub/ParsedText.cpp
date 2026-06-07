@@ -3,6 +3,7 @@
 #include <BidiUtils.h>
 #include <GfxRenderer.h>
 #include <Utf8.h>
+#include <linebreak.h>
 
 #include <algorithm>
 #include <cmath>
@@ -59,64 +60,43 @@ uint32_t lastCodepoint(const std::string& word) {
 
 bool containsSoftHyphen(const std::string& word) { return word.find(SOFT_HYPHEN_UTF8) != std::string::npos; }
 
-bool isCjkBreakableCodepoint(const uint32_t cp) {
-  return (cp >= 0x3040 && cp <= 0x30FF) ||  // Hiragana/Katakana
-         (cp >= 0x3130 && cp <= 0x318F) ||  // Hangul Compatibility Jamo
-         (cp >= 0x3400 && cp <= 0x4DBF) ||  // CJK Extension A
-         (cp >= 0x4E00 && cp <= 0x9FFF) ||  // CJK Unified Ideographs
-         (cp >= 0xAC00 && cp <= 0xD7A3) ||  // Hangul syllables
-         (cp >= 0xF900 && cp <= 0xFAFF) ||  // CJK Compatibility Ideographs
-         (cp >= 0xFF01 && cp <= 0xFF60) ||  // Fullwidth punctuation/forms
-         (cp >= 0xFFE0 && cp <= 0xFFE6);
+bool isAllowedUnicodeBreak(const char brk) {
+  return brk == LINEBREAK_ALLOWBREAK || brk == LINEBREAK_MUSTBREAK || brk == LINEBREAK_INDETERMINATE;
 }
 
-bool containsCjkBreakableCodepoint(const std::string& word) {
-  const auto* ptr = reinterpret_cast<const unsigned char*>(word.c_str());
-  while (uint32_t cp = utf8NextCodepoint(&ptr)) {
-    if (isCjkBreakableCodepoint(cp)) return true;
-  }
-  return false;
-}
+std::vector<size_t> unicodeLineBreakByteOffsets(const std::string& text) {
+  std::vector<size_t> codepointEndOffsets;
+  codepointEndOffsets.reserve(text.size());
 
-bool isNoBreakBeforePunctuation(const uint32_t cp) {
-  switch (cp) {
-    case '!':
-    case '%':
-    case ')':
-    case ',':
-    case '.':
-    case ':':
-    case ';':
-    case '?':
-    case ']':
-    case '}':
-    case 0x2019:  // right single quote
-    case 0x201D:  // right double quote
-    case 0x3001:  // ideographic comma
-    case 0x3002:  // ideographic full stop
-    case 0x3009:
-    case 0x300B:
-    case 0x300D:
-    case 0x300F:
-    case 0x3011:
-    case 0x3015:
-    case 0x3017:
-    case 0x3019:
-    case 0x301B:
-    case 0xFF01:
-    case 0xFF05:
-    case 0xFF09:
-    case 0xFF0C:
-    case 0xFF0E:
-    case 0xFF1A:
-    case 0xFF1B:
-    case 0xFF1F:
-    case 0xFF3D:
-    case 0xFF5D:
-      return true;
-    default:
-      return false;
+  const auto* ptr = reinterpret_cast<const unsigned char*>(text.c_str());
+  const auto* const start = ptr;
+  while (*ptr) {
+    utf8NextCodepoint(&ptr);
+    if (*ptr) {
+      codepointEndOffsets.push_back(static_cast<size_t>(ptr - start));
+    }
   }
+  if (codepointEndOffsets.empty()) return {};
+
+  static bool initialized = false;
+  if (!initialized) {
+    init_linebreak();
+    initialized = true;
+  }
+
+  std::vector<char> breaks(codepointEndOffsets.size() + 1, LINEBREAK_NOBREAK);
+  const size_t breakCount =
+      set_linebreaks_utf8_per_code_point(reinterpret_cast<const utf8_t*>(text.c_str()), text.size(), "", breaks.data());
+
+  const size_t boundaryCount = std::min(codepointEndOffsets.size(), breakCount);
+  std::vector<size_t> allowedOffsets;
+  allowedOffsets.reserve(boundaryCount);
+  for (size_t i = 0; i < boundaryCount; ++i) {
+    if (isAllowedUnicodeBreak(breaks[i])) {
+      allowedOffsets.push_back(codepointEndOffsets[i]);
+    }
+  }
+  return allowedOffsets;
 }
 
 int computeJustifyExtra(const int spareSpace, const size_t gapCount) {
@@ -209,42 +189,18 @@ void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle,
     wordIsFocusSuffix.push_back(isFocusSuffix);
   };
 
-  if (containsCjkBreakableCodepoint(word)) {
-    const auto flushSegment = [&](const unsigned char* start, const unsigned char* end, bool& firstToken) {
-      if (start >= end) return;
-      const auto* cpPtr = start;
-      const uint32_t cp = utf8NextCodepoint(&cpPtr);
-      const bool attachPunctuation = !firstToken && isNoBreakBeforePunctuation(cp);
-      pushToken(std::string(reinterpret_cast<const char*>(start), end - start),
-                firstToken ? attachToPrevious : attachPunctuation, !firstToken && !attachPunctuation, false);
-      firstToken = false;
-    };
-
-    const unsigned char* segmentStart = reinterpret_cast<const unsigned char*>(word.c_str());
-    const unsigned char* ptr = segmentStart;
-    const unsigned char* segmentEnd = segmentStart;
+  if (auto breakOffsets = unicodeLineBreakByteOffsets(word); !breakOffsets.empty()) {
     bool firstToken = true;
-    while (*ptr) {
-      const unsigned char* cpStart = ptr;
-      const uint32_t cp = utf8NextCodepoint(&ptr);
-      if (cp == 0) break;
-      if (!isCjkBreakableCodepoint(cp)) {
-        segmentEnd = ptr;
-        continue;
-      }
-
-      if (segmentStart < cpStart) {
-        flushSegment(segmentStart, cpStart, firstToken);
-      }
-      const bool attachPunctuation = !firstToken && isNoBreakBeforePunctuation(cp);
-      pushToken(std::string(reinterpret_cast<const char*>(cpStart), ptr - cpStart),
-                firstToken ? attachToPrevious : attachPunctuation, !firstToken && !attachPunctuation, false);
+    size_t tokenStart = 0;
+    for (const size_t breakOffset : breakOffsets) {
+      if (breakOffset <= tokenStart || breakOffset > word.size()) continue;
+      pushToken(word.substr(tokenStart, breakOffset - tokenStart), firstToken ? attachToPrevious : false, !firstToken,
+                false);
       firstToken = false;
-      segmentStart = ptr;
-      segmentEnd = ptr;
+      tokenStart = breakOffset;
     }
-    if (segmentStart < segmentEnd) {
-      flushSegment(segmentStart, segmentEnd, firstToken);
+    if (tokenStart < word.size()) {
+      pushToken(word.substr(tokenStart), firstToken ? attachToPrevious : false, !firstToken, false);
     }
     if (wordStartsRtl) {
       hasRtlWord = true;
