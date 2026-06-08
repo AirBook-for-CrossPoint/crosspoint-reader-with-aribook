@@ -3,7 +3,6 @@
 #include <BidiUtils.h>
 #include <GfxRenderer.h>
 #include <Utf8.h>
-#include <linebreak.h>
 
 #include <algorithm>
 #include <cmath>
@@ -60,41 +59,104 @@ uint32_t lastCodepoint(const std::string& word) {
 
 bool containsSoftHyphen(const std::string& word) { return word.find(SOFT_HYPHEN_UTF8) != std::string::npos; }
 
-bool isAllowedUnicodeBreak(const char brk) {
-  return brk == LINEBREAK_ALLOWBREAK || brk == LINEBREAK_MUSTBREAK || brk == LINEBREAK_INDETERMINATE;
+bool isNoBreakBeforeCjkPunctuation(const uint32_t cp) {
+  switch (cp) {
+    case '.':
+    case ',':
+    case ':':
+    case ';':
+    case '!':
+    case '?':
+    case ')':
+    case ']':
+    case '}':
+    case 0x00BB:  // »
+    case 0x2019:  // ’
+    case 0x201D:  // ”
+    case 0x3001:  // 、
+    case 0x3002:  // 。
+    case 0x3009:  // 〉
+    case 0x300B:  // 》
+    case 0x300D:  // 」
+    case 0x300F:  // 』
+    case 0x3011:  // 】
+    case 0x3015:  // 〕
+    case 0x3017:  // 〗
+    case 0x3019:  // 〙
+    case 0x301B:  // 〛
+    case 0xFF01:  // ！
+    case 0xFF09:  // ）
+    case 0xFF0C:  // ，
+    case 0xFF0E:  // ．
+    case 0xFF1A:  // ：
+    case 0xFF1B:  // ；
+    case 0xFF1F:  // ？
+    case 0xFF3D:  // ］
+    case 0xFF5D:  // ｝
+      return true;
+    default:
+      return false;
+  }
 }
 
-std::vector<size_t> unicodeLineBreakByteOffsets(const std::string& text) {
-  std::vector<size_t> codepointEndOffsets;
-  codepointEndOffsets.reserve(text.size());
+bool isNoBreakAfterCjkPunctuation(const uint32_t cp) {
+  switch (cp) {
+    case '(':
+    case '[':
+    case '{':
+    case 0x00AB:  // «
+    case 0x2018:  // ‘
+    case 0x201C:  // “
+    case 0x3008:  // 〈
+    case 0x300A:  // 《
+    case 0x300C:  // 「
+    case 0x300E:  // 『
+    case 0x3010:  // 【
+    case 0x3014:  // 〔
+    case 0x3016:  // 〖
+    case 0x3018:  // 〘
+    case 0x301A:  // 〚
+    case 0xFF08:  // （
+    case 0xFF3B:  // ［
+    case 0xFF5B:  // ｛
+      return true;
+    default:
+      return false;
+  }
+}
+
+std::vector<size_t> cjkCharacterBreakByteOffsets(const std::string& text) {
+  struct CodepointBoundary {
+    uint32_t cp;
+    size_t endOffset;
+  };
+
+  std::vector<CodepointBoundary> codepoints;
+  codepoints.reserve(text.size());
+  bool hasCjkBreakable = false;
 
   const auto* ptr = reinterpret_cast<const unsigned char*>(text.c_str());
   const auto* const start = ptr;
   while (*ptr) {
-    utf8NextCodepoint(&ptr);
-    if (*ptr) {
-      codepointEndOffsets.push_back(static_cast<size_t>(ptr - start));
+    const uint32_t cp = utf8NextCodepoint(&ptr);
+    if (cp == 0) break;
+    if (utf8IsCjkBreakable(cp)) {
+      hasCjkBreakable = true;
     }
-  }
-  if (codepointEndOffsets.empty()) return {};
-
-  static bool initialized = false;
-  if (!initialized) {
-    init_linebreak();
-    initialized = true;
+    codepoints.push_back({cp, static_cast<size_t>(ptr - start)});
   }
 
-  std::vector<char> breaks(codepointEndOffsets.size() + 1, LINEBREAK_NOBREAK);
-  const size_t breakCount =
-      set_linebreaks_utf8_per_code_point(reinterpret_cast<const utf8_t*>(text.c_str()), text.size(), "", breaks.data());
+  if (!hasCjkBreakable || codepoints.size() < 2) return {};
 
-  const size_t boundaryCount = std::min(codepointEndOffsets.size(), breakCount);
   std::vector<size_t> allowedOffsets;
-  allowedOffsets.reserve(boundaryCount);
-  for (size_t i = 0; i < boundaryCount; ++i) {
-    if (isAllowedUnicodeBreak(breaks[i])) {
-      allowedOffsets.push_back(codepointEndOffsets[i]);
-    }
+  allowedOffsets.reserve(codepoints.size() - 1);
+  for (size_t i = 0; i + 1 < codepoints.size(); ++i) {
+    const uint32_t current = codepoints[i].cp;
+    const uint32_t next = codepoints[i + 1].cp;
+    if (!utf8IsCjkBreakable(current) && !utf8IsCjkBreakable(next)) continue;
+    if (isNoBreakAfterCjkPunctuation(current) || isNoBreakBeforeCjkPunctuation(next)) continue;
+    if (utf8IsCombiningMark(next)) continue;
+    allowedOffsets.push_back(codepoints[i].endOffset);
   }
   return allowedOffsets;
 }
@@ -189,7 +251,7 @@ void ParsedText::addWord(std::string word, const EpdFontFamily::Style fontStyle,
     wordIsFocusSuffix.push_back(isFocusSuffix);
   };
 
-  if (auto breakOffsets = unicodeLineBreakByteOffsets(word); !breakOffsets.empty()) {
+  if (auto breakOffsets = cjkCharacterBreakByteOffsets(word); !breakOffsets.empty()) {
     bool firstToken = true;
     size_t tokenStart = 0;
     for (const size_t breakOffset : breakOffsets) {
@@ -763,7 +825,9 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
     lineWordWidthSum += wordWidths[lastBreakAt + wordIdx];
     // Count gaps: each word after the first creates a gap, unless it's a continuation
     if (wordIdx > 0 && noSpaceBeforeVec[lastBreakAt + wordIdx]) {
-      // CJK-adjacent break opportunity: no inserted Latin-style space.
+      // Unicode break opportunity with no inserted Latin-style space. It is still
+      // a stretchable gap for justified CJK/Korean text.
+      actualGapCount++;
     } else if (wordIdx > 0 && !continuesVec[lastBreakAt + wordIdx]) {
       actualGapCount++;
       totalNaturalGaps += renderer.getSpaceAdvance(fontId, lastCodepoint(lineWords[wordIdx - 1]),
@@ -855,7 +919,9 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
     for (size_t wordIdx = 0; wordIdx < reorderedWidthsScratch.size(); wordIdx++) {
       reorderedWordWidthSum += reorderedWidthsScratch[wordIdx];
       if (wordIdx > 0 && reorderedNoSpaceBeforeScratch[wordIdx]) {
-        // CJK-adjacent break opportunity: no inserted Latin-style space.
+        // Unicode break opportunity with no inserted Latin-style space. It is still
+        // a stretchable gap for justified CJK/Korean text.
+        reorderedGapCount++;
       } else if (wordIdx > 0 && !reorderedContinuesScratch[wordIdx]) {
         reorderedGapCount++;
         reorderedNaturalGaps += renderer.getSpaceAdvance(fontId, lastCodepoint(reorderedWordsScratch[wordIdx - 1]),
@@ -918,7 +984,7 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
                               : renderer.getSpaceAdvance(fontId, lastCodepoint(reorderedWordsScratch[wordIdx]),
                                                          firstCodepoint(reorderedWordsScratch[wordIdx + 1]),
                                                          reorderedStylesScratch[wordIdx]);
-        if (!nextNoSpace && effectiveAlignment == CssTextAlign::Justify && !isLastLine) {
+        if (effectiveAlignment == CssTextAlign::Justify && !isLastLine) {
           gap += reorderedJustifyExtra;
         }
         xpos += gap;
@@ -964,7 +1030,7 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
                       : renderer.getSpaceAdvance(fontId, lastCodepoint(lineWords[wordIdx]),
                                                  firstCodepoint(lineWords[wordIdx + 1]), lineWordStyles[wordIdx]);
           }
-          if (!nextNoSpace && effectiveAlignment == CssTextAlign::Justify && !isLastLine) {
+          if (wordIdx + 1 < lineWordCount && effectiveAlignment == CssTextAlign::Justify && !isLastLine) {
             gap += justifyExtra;
           }
           xpos -= gap;
@@ -1002,7 +1068,7 @@ void ParsedText::extractLine(const size_t breakIndex, const int pageWidth, const
                       : renderer.getSpaceAdvance(fontId, lastCodepoint(lineWords[wordIdx]),
                                                  firstCodepoint(lineWords[wordIdx + 1]), lineWordStyles[wordIdx]);
           }
-          if (!nextNoSpace && effectiveAlignment == CssTextAlign::Justify && !isLastLine) {
+          if (wordIdx + 1 < lineWordCount && effectiveAlignment == CssTextAlign::Justify && !isLastLine) {
             gap += justifyExtra;
           }
           xpos += wordWidths[lastBreakAt + wordIdx] + gap;
