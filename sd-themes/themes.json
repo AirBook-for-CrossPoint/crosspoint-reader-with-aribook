@@ -107,6 +107,138 @@
       "totalSize": 6993
     },
     {
+      "id": "classic",
+      "name": "Classic",
+      "description": "The original CrossPoint look with square selections, centered home buttons, and the classic cover card.",
+      "files": [
+        {
+          "path": "theme.json",
+          "url": "classic/theme.json",
+          "size": 4178,
+          "crc32": 1639338437
+        }
+      ],
+      "totalSize": 4178
+    },
+    {
+      "id": "lyra-3-covers",
+      "name": "Lyra 3 Covers",
+      "description": "Lyra with three recent book covers across the home screen for faster visual switching.",
+      "files": [
+        {
+          "path": "icons/book.bmp",
+          "url": "lyra-3-covers/icons/book.bmp",
+          "size": 190,
+          "crc32": 2024654237
+        },
+        {
+          "path": "icons/book24.bmp",
+          "url": "lyra-3-covers/icons/book24.bmp",
+          "size": 158,
+          "crc32": 3979654830
+        },
+        {
+          "path": "icons/bookmark.bmp",
+          "url": "lyra-3-covers/icons/bookmark.bmp",
+          "size": 190,
+          "crc32": 2661833068
+        },
+        {
+          "path": "icons/cover.bmp",
+          "url": "lyra-3-covers/icons/cover.bmp",
+          "size": 190,
+          "crc32": 4277343188
+        },
+        {
+          "path": "icons/file24.bmp",
+          "url": "lyra-3-covers/icons/file24.bmp",
+          "size": 158,
+          "crc32": 2617288513
+        },
+        {
+          "path": "icons/folder.bmp",
+          "url": "lyra-3-covers/icons/folder.bmp",
+          "size": 190,
+          "crc32": 2058771447
+        },
+        {
+          "path": "icons/folder24.bmp",
+          "url": "lyra-3-covers/icons/folder24.bmp",
+          "size": 158,
+          "crc32": 3210810266
+        },
+        {
+          "path": "icons/hotspot.bmp",
+          "url": "lyra-3-covers/icons/hotspot.bmp",
+          "size": 190,
+          "crc32": 1094047065
+        },
+        {
+          "path": "icons/image24.bmp",
+          "url": "lyra-3-covers/icons/image24.bmp",
+          "size": 158,
+          "crc32": 4245831462
+        },
+        {
+          "path": "icons/library.bmp",
+          "url": "lyra-3-covers/icons/library.bmp",
+          "size": 190,
+          "crc32": 3825893573
+        },
+        {
+          "path": "icons/recent.bmp",
+          "url": "lyra-3-covers/icons/recent.bmp",
+          "size": 190,
+          "crc32": 1431260786
+        },
+        {
+          "path": "icons/settings2.bmp",
+          "url": "lyra-3-covers/icons/settings2.bmp",
+          "size": 190,
+          "crc32": 2285623569
+        },
+        {
+          "path": "icons/text24.bmp",
+          "url": "lyra-3-covers/icons/text24.bmp",
+          "size": 158,
+          "crc32": 2842394777
+        },
+        {
+          "path": "icons/transfer.bmp",
+          "url": "lyra-3-covers/icons/transfer.bmp",
+          "size": 190,
+          "crc32": 3478276151
+        },
+        {
+          "path": "icons/wifi.bmp",
+          "url": "lyra-3-covers/icons/wifi.bmp",
+          "size": 190,
+          "crc32": 2222207198
+        },
+        {
+          "path": "theme.json",
+          "url": "lyra-3-covers/theme.json",
+          "size": 3629,
+          "crc32": 3107595529
+        }
+      ],
+      "totalSize": 6319
+    },
+    {
+      "id": "roundedraff",
+      "name": "RoundedRaff",
+      "description": "A rounded, high-contrast theme with pill menus, rounded list rows, and grouped button hints.",
+      "files": [
+        {
+          "path": "theme.json",
+          "url": "roundedraff/theme.json",
+          "size": 5064,
+          "crc32": 2087018682
+        }
+      ],
+      "totalSize": 5064
+    },
+    {
       "id": "super-minimal",
       "name": "Super Minimal",
       "description": "A quiet text-only theme with no cover area, centered home options, underline selection, and icon-only hints.",
@@ -119,48 +251,6 @@
         }
       ],
       "totalSize": 2541
-    },
-    {
-      "id": "roundedraff",
-      "name": "RoundedRaff",
-      "description": "Rounded corners everywhere: pill selections, pill tabs, rounded keyboard keys, and soft popups.",
-      "files": [
-        {
-          "path": "theme.json",
-          "url": "roundedraff/theme.json",
-          "size": 2297,
-          "crc32": 409458708
-        }
-      ],
-      "totalSize": 2297
-    },
-    {
-      "id": "classic",
-      "name": "Classic",
-      "description": "The original CrossPoint look: square corners, compact rows, and a large single cover.",
-      "files": [
-        {
-          "path": "theme.json",
-          "url": "classic/theme.json",
-          "size": 1348,
-          "crc32": 3370607679
-        }
-      ],
-      "totalSize": 1348
-    },
-    {
-      "id": "lyra-3-covers",
-      "name": "Lyra 3 Covers",
-      "description": "The Lyra look with three recent-book covers side by side on the home screen.",
-      "files": [
-        {
-          "path": "theme.json",
-          "url": "lyra-3-covers/theme.json",
-          "size": 363,
-          "crc32": 601164071
-        }
-      ],
-      "totalSize": 363
     }
   ]
 }
