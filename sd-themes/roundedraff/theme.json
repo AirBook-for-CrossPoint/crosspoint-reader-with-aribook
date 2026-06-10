@@ -38,13 +38,24 @@
   },
   "components": {
     "homeMenu": {
+      "font": "ui12",
+      "bold": true,
       "selectionStyle": "pill",
-      "selectionCornerRadius": 10,
+      "selectionCornerRadius": 30,
+      "rowPaddingX": 40,
+      "textInsetX": 20,
+      "selectionInset": 0,
       "selectedTextInverted": true
     },
     "list": {
-      "selectionStyle": "pill",
-      "selectionCornerRadius": 10,
+      "font": "ui12",
+      "bold": true,
+      "subtitleFont": "small",
+      "rowBackgrounds": true,
+      "selectionCornerRadius": 20,
+      "rowGap": 6,
+      "rowSidePadding": 20,
+      "textInsetX": 20,
       "selectedTextInverted": true
     },
     "tabBar": {
@@ -62,6 +73,12 @@
       "bold": true,
       "centeredTitle": false,
       "showDivider": false
+    },
+    "buttonHints": {
+      "font": "small",
+      "fill": true,
+      "outline": true,
+      "cornerRadius": 15
     }
   }
 }

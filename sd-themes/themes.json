@@ -128,11 +128,11 @@
         {
           "path": "theme.json",
           "url": "roundedraff/theme.json",
-          "size": 1819,
-          "crc32": 3087905175
+          "size": 2198,
+          "crc32": 1391678150
         }
       ],
-      "totalSize": 1819
+      "totalSize": 2198
     },
     {
       "id": "classic",
@@ -142,11 +142,11 @@
         {
           "path": "theme.json",
           "url": "classic/theme.json",
-          "size": 1220,
-          "crc32": 1699551588
+          "size": 1275,
+          "crc32": 3727450893
         }
       ],
-      "totalSize": 1220
+      "totalSize": 1275
     },
     {
       "id": "lyra-3-covers",
@@ -156,11 +156,11 @@
         {
           "path": "theme.json",
           "url": "lyra-3-covers/theme.json",
-          "size": 747,
-          "crc32": 35725400
+          "size": 363,
+          "crc32": 601164071
         }
       ],
-      "totalSize": 747
+      "totalSize": 363
     }
   ]
 }

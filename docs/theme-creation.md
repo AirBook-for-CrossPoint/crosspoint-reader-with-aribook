@@ -182,6 +182,9 @@ Supported types:
 - `card`: a single centered book card — cover width follows the image aspect
   ratio at the `homeCoverHeight` metric, with a bookmark ribbon, title/author
   block, and Continue Reading label drawn on the card.
+- `tiles`: `homeRecentBooksCount` equal-width cover tiles side by side,
+  crop-filled covers with wrapped titles below and a dithered selection band
+  (the Lyra 3 Covers look).
 
 Example:
 

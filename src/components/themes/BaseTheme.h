@@ -99,7 +99,7 @@ struct ThemeMetrics {
   int textFieldLineEndOffset;
 };
 
-enum class ThemeHomeRecentsType { Default, None, CoverStrip, Card };
+enum class ThemeHomeRecentsType { Default, None, CoverStrip, Card, Tiles };
 enum class ThemeBookRef { Previous, Selected, Next, Index };
 enum class ThemeSlotX { Padding, Center, RightPadding };
 enum class ThemeSlotY { Top, Center };
@@ -395,4 +395,11 @@ class BaseTheme final {
   void drawCardRecents(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,
                        int selectorIndex, bool& coverRendered, bool& coverBufferStored, bool bufferRestored,
                        std::function<bool()> storeCoverBuffer) const;
+  // Equal-width side-by-side cover tiles (homeRecentBooksCount of them),
+  // crop-filled covers with wrapped titles below and a dithered selection
+  // band (the original Lyra 3 Covers look, selected by homeRecents type
+  // "tiles").
+  void drawTilesRecents(GfxRenderer& renderer, Rect rect, const std::vector<RecentBook>& recentBooks,
+                        int selectorIndex, bool& coverRendered, bool& coverBufferStored,
+                        std::function<bool()> storeCoverBuffer) const;
 };

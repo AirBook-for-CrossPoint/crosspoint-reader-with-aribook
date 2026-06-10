@@ -34,12 +34,14 @@
     "homeMenu": {
       "selectionStyle": "fill",
       "selectionCornerRadius": 0,
-      "selectedTextInverted": true
+      "selectedTextInverted": true,
+      "selectionFillBlack": true
     },
     "list": {
-      "selectionStyle": "fill",
+      "rowBackgrounds": true,
       "selectionCornerRadius": 0,
-      "selectedTextInverted": true
+      "selectedTextInverted": true,
+      "textInsetX": 8
     },
     "homeRecents": {
       "type": "card"

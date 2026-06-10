@@ -158,6 +158,8 @@ void parseHomeRecentsSpec(JsonObjectConst obj, ThemeHomeRecentsSpec& spec) {
       spec.type = ThemeHomeRecentsType::CoverStrip;
     } else if (strcmp(type, "card") == 0) {
       spec.type = ThemeHomeRecentsType::Card;
+    } else if (strcmp(type, "tiles") == 0) {
+      spec.type = ThemeHomeRecentsType::Tiles;
     } else if (strcmp(type, "none") == 0) {
       spec.type = ThemeHomeRecentsType::None;
     }
