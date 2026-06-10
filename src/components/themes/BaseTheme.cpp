@@ -10,6 +10,8 @@
 #include <cstdint>
 #include <string>
 
+#include <FreeInkUIGfxRenderer.h>
+
 #include "I18n.h"
 #include "RecentBooksStore.h"
 #include "components/UITheme.h"
@@ -20,6 +22,36 @@ namespace {
 constexpr int homeMenuMargin = 20;
 constexpr int homeMarginTop = 30;
 constexpr int subtitleY = 738;
+
+namespace fui = freeink::ui;
+
+// Render-only FreeInkUI frame over the renderer with the standard font slots
+// bound. Theme drawing is draw-only, so no interactions are registered.
+struct UiFrame {
+  fui::GfxRendererTarget target;
+  fui::InteractionBuffer<1> interactions;
+  fui::InputSnapshot input{};
+  fui::DeviceContext device;
+  fui::Frame<1> frame;
+
+  explicit UiFrame(const GfxRenderer& renderer)
+      : target(renderer), device(target.deviceContext()), frame(target, device, input, interactions) {
+    target.setFont(fui::GfxRendererTarget::FONT_SMALL, SMALL_FONT_ID);
+    target.setFont(fui::GfxRendererTarget::FONT_BODY, UI_12_FONT_ID);
+    target.setFont(fui::GfxRendererTarget::FONT_TITLE, UI_12_FONT_ID);
+  }
+};
+
+fui::TextStyle uiText(const fui::FontId font, const fui::TextAlign align = fui::TextAlign::Left,
+                      const bool bold = false, const fui::Color color = fui::Color::Black) {
+  fui::TextStyle style;
+  style.font = font;
+  style.align = align;
+  style.bold = bold;
+  style.color = color;
+  style.inverted = color == fui::Color::White;
+  return style;
+}
 
 }  // namespace
 
@@ -676,28 +708,38 @@ Rect BaseTheme::drawPopup(const GfxRenderer& renderer, const char* message) cons
   const int marginX = metrics.popupMarginX;
   const int marginY = metrics.popupMarginY;
   const int frameThickness = metrics.popupFrameThickness;
-  const EpdFontFamily::Style popupFontFamily = metrics.popupTextBold ? EpdFontFamily::BOLD : EpdFontFamily::REGULAR;
-  // Scale y position proportionally to screen height
+  const bool rounded = metrics.popupCornerRadius > 0;
+
+  UiFrame ui(renderer);
+  const fui::TextStyle messageText = uiText(fui::GfxRendererTarget::FONT_BODY, fui::TextAlign::Center,
+                                            metrics.popupTextBold,
+                                            metrics.popupTextInverted ? fui::Color::Black : fui::Color::White);
+
+  // Popup sizes to the message; y scales proportionally to screen height.
   const int y = static_cast<int>(renderer.getScreenHeight() * metrics.popupTopOffsetRatio);
-  const int textWidth = renderer.getTextWidth(UI_12_FONT_ID, message, popupFontFamily);
-  const int textHeight = renderer.getLineHeight(UI_12_FONT_ID);
-  const int w = textWidth + marginX * 2;
-  const int h = textHeight + marginY * 2;
+  const fui::Size textSize = ui.target.measureText(messageText.font, message, messageText);
+  const int w = textSize.width + marginX * 2;
+  const int h = textSize.height + marginY * 2;
   const int x = (renderer.getScreenWidth() - w) / 2;
 
-  const bool useRoundedPopup = metrics.popupCornerRadius > 0;
-  if (useRoundedPopup) {
-    renderer.fillRoundedRect(x - frameThickness, y - frameThickness, w + frameThickness * 2, h + frameThickness * 2,
-                             metrics.popupCornerRadius + frameThickness, Color::White);
-    renderer.fillRoundedRect(x, y, w, h, metrics.popupCornerRadius, Color::Black);
-  } else {
-    renderer.fillRect(x - frameThickness, y - frameThickness, w + frameThickness * 2, h + frameThickness * 2, true);
-    renderer.fillRect(x, y, w, h, false);
-  }
+  // Rounded popups are dark-on-light-frame; square popups are the reverse.
+  fui::PopupProps props;
+  props.message = message;
+  props.text = messageText;
+  // The baseline offset shifts the message without changing the popup box:
+  // asymmetric padding keeps the content height identical.
+  props.padding = fui::Insets{static_cast<int16_t>(marginY + frameThickness + metrics.popupTextBaselineOffsetY),
+                              static_cast<int16_t>(marginX + frameThickness),
+                              static_cast<int16_t>(marginY + frameThickness - metrics.popupTextBaselineOffsetY),
+                              static_cast<int16_t>(marginX + frameThickness)};
+  props.styles.normal.background = fui::Paint::solid(rounded ? fui::Color::Black : fui::Color::White);
+  props.styles.normal.border = fui::Paint::solid(rounded ? fui::Color::White : fui::Color::Black);
+  props.styles.normal.borderWidth = static_cast<uint8_t>(frameThickness);
+  props.styles.normal.radius = static_cast<uint8_t>(rounded ? metrics.popupCornerRadius + frameThickness : 0);
 
-  const int textX = x + (w - textWidth) / 2;
-  const int textY = y + marginY + metrics.popupTextBaselineOffsetY;
-  renderer.drawText(UI_12_FONT_ID, textX, textY, message, metrics.popupTextInverted, popupFontFamily);
+  const fui::Rect outer{static_cast<int16_t>(x - frameThickness), static_cast<int16_t>(y - frameThickness),
+                        static_cast<int16_t>(w + frameThickness * 2), static_cast<int16_t>(h + frameThickness * 2)};
+  fui::popup(ui.frame, outer, props);
   renderer.displayBuffer();
   return Rect{x, y, w, h};
 }
@@ -714,16 +756,19 @@ void BaseTheme::fillPopupProgress(const GfxRenderer& renderer, const Rect& layou
     return;
   }
 
-  const int scaledProgress = metrics.popupProgressClampPercent ? std::clamp(progress, 0, 100) : progress;
-  const int fillWidth = barWidth * scaledProgress / 100;
-
+  UiFrame ui(renderer);
+  fui::ProgressBarProps bar;
+  bar.value = metrics.popupProgressClampPercent ? std::clamp(progress, 0, 100) : progress;
+  bar.max = 100;
+  bar.fill = fui::Paint::solid(metrics.popupProgressFillInverted ? fui::Color::Black : fui::Color::White);
   if (metrics.popupProgressDrawOutline) {
-    renderer.drawRect(barX, barY, barWidth, barHeight, 1, metrics.popupProgressOutlineInverted);
+    bar.border = fui::Paint::solid(metrics.popupProgressOutlineInverted ? fui::Color::Black : fui::Color::White);
+    bar.borderWidth = 1;
   }
-  if (fillWidth > 0) {
-    renderer.fillRect(barX, barY, fillWidth, barHeight, metrics.popupProgressFillInverted);
-  }
-
+  fui::progressBar(ui.frame,
+                   fui::Rect{static_cast<int16_t>(barX), static_cast<int16_t>(barY), static_cast<int16_t>(barWidth),
+                             static_cast<int16_t>(barHeight)},
+                   bar);
   renderer.displayBuffer(HalDisplay::FAST_REFRESH);
 }
 
@@ -735,107 +780,73 @@ void BaseTheme::drawStatusBar(GfxRenderer& renderer, const float bookProgress, c
   renderer.getOrientedViewableTRBL(&orientedMarginTop, &orientedMarginRight, &orientedMarginBottom,
                                    &orientedMarginLeft);
 
-  // Draw Progress Text
+  UiFrame ui(renderer);
   const auto screenHeight = renderer.getScreenHeight();
-  auto textY = screenHeight - UITheme::getInstance().getStatusBarHeight() - orientedMarginBottom - paddingBottom - 4;
-  int progressTextWidth = 0;
+  const int textY = screenHeight - UITheme::getInstance().getStatusBarHeight() - orientedMarginBottom - paddingBottom - 4;
 
-  if (SETTINGS.statusBarBookProgressPercentage || SETTINGS.statusBarChapterPageCount) {
-    // Right aligned text for progress counter
-    char progressStr[32];
-
-    if (SETTINGS.statusBarBookProgressPercentage && SETTINGS.statusBarChapterPageCount) {
-      snprintf(progressStr, sizeof(progressStr), "%d/%d  %.0f%%", currentPage, pageCount, bookProgress);
-    } else if (SETTINGS.statusBarBookProgressPercentage) {
-      snprintf(progressStr, sizeof(progressStr), "%.0f%%", bookProgress);
-    } else {
-      snprintf(progressStr, sizeof(progressStr), "%d/%d", currentPage, pageCount);
-    }
-
-    progressTextWidth = renderer.getTextWidth(SMALL_FONT_ID, progressStr);
-    renderer.drawText(
-        SMALL_FONT_ID,
-        renderer.getScreenWidth() - metrics.statusBarHorizontalMargin - orientedMarginRight - progressTextWidth, textY,
-        progressStr);
+  // The bar's text row: settings decide which strings exist, the app formats
+  // them, and the FreeInkUI statusBar lays out clusters and the title.
+  char progressStr[32] = {0};
+  if (SETTINGS.statusBarBookProgressPercentage && SETTINGS.statusBarChapterPageCount) {
+    snprintf(progressStr, sizeof(progressStr), "%d/%d  %.0f%%", currentPage, pageCount, bookProgress);
+  } else if (SETTINGS.statusBarBookProgressPercentage) {
+    snprintf(progressStr, sizeof(progressStr), "%.0f%%", bookProgress);
+  } else if (SETTINGS.statusBarChapterPageCount) {
+    snprintf(progressStr, sizeof(progressStr), "%d/%d", currentPage, pageCount);
   }
 
-  // Draw Progress Bar
-  if (SETTINGS.statusBarProgressBar != CrossPointSettings::STATUS_BAR_PROGRESS_BAR::HIDE_PROGRESS) {
-    const int barMarginLeft = fillMargin ? 0 : orientedMarginLeft;
-    const int barMarginRight = fillMargin ? 0 : orientedMarginRight;
-    const int progressBarMaxWidth = renderer.getScreenWidth() - barMarginLeft - barMarginRight;
-    const int progressBarY = renderer.getScreenHeight() - orientedMarginBottom -
-                             ((SETTINGS.statusBarProgressBarThickness + 1) * 2) - paddingBottom;
-    size_t progress;
-    if (SETTINGS.statusBarProgressBar == CrossPointSettings::STATUS_BAR_PROGRESS_BAR::BOOK_PROGRESS) {
-      progress = static_cast<size_t>(bookProgress);
-    } else {
-      // Chapter progress
-      progress = (pageCount > 0) ? (static_cast<float>(currentPage) / pageCount) * 100 : 0;
-    }
-    const int barWidth = progressBarMaxWidth * progress / 100;
-    const int barHeight =
-        ((SETTINGS.statusBarProgressBarThickness + 1) * 2) + (fillMargin ? orientedMarginBottom - 1 : 0);
-    renderer.fillRect(barMarginLeft, progressBarY, barWidth, barHeight, true);
+  char timeBuf[9] = {0};  // X3 only — DS3231 RTC
+  if (SETTINGS.statusBarClock && halClock.isAvailable()) {
+    halClock.formatTime(timeBuf, sizeof(timeBuf), SETTINGS.clockUtcOffsetQ, SETTINGS.clockFormat == 1);
   }
 
-  // Draw Battery
+  // Battery stays theme-drawn (Lyra overrides the glyph); the component just
+  // keeps the title clear of it via leadingReserve.
   const bool showBatteryPercentage =
       SETTINGS.hideBatteryPercentage == CrossPointSettings::HIDE_BATTERY_PERCENTAGE::HIDE_NEVER;
+  int16_t batteryReserve = 0;
   if (SETTINGS.statusBarBattery) {
     GUI.drawBatteryLeft(renderer,
                         Rect{metrics.statusBarHorizontalMargin + orientedMarginLeft + 1, textY, metrics.batteryWidth,
                              metrics.batteryHeight},
                         showBatteryPercentage);
+    batteryReserve = static_cast<int16_t>((showBatteryPercentage ? 50 : 20) + 30);
   }
 
-  // Draw Clock (X3 only — DS3231 RTC)
-  int clockTextWidth = 0;
-  if (SETTINGS.statusBarClock && halClock.isAvailable()) {
-    char timeBuf[9];
-    if (halClock.formatTime(timeBuf, sizeof(timeBuf), SETTINGS.clockUtcOffsetQ, SETTINGS.clockFormat == 1)) {
-      clockTextWidth = renderer.getTextWidth(SMALL_FONT_ID, timeBuf);
-      // Position to the left of the progress text (with a small gap)
-      const int clockX = renderer.getScreenWidth() - metrics.statusBarHorizontalMargin - orientedMarginRight -
-                         progressTextWidth - (progressTextWidth > 0 ? 10 : 0) - clockTextWidth;
-      renderer.drawText(SMALL_FONT_ID, clockX, textY, timeBuf);
-    }
-  }
+  fui::StatusBarProps bar;
+  bar.title = title.empty() ? nullptr : title.c_str();
+  bar.trailing = progressStr[0] != '\0' ? progressStr : nullptr;
+  bar.trailingSecondary = timeBuf[0] != '\0' ? timeBuf : nullptr;
+  bar.leadingReserve = batteryReserve;
+  bar.titleOffsetY = static_cast<int16_t>(textYOffset);
+  bar.text = uiText(fui::GfxRendererTarget::FONT_SMALL);
+  bar.horizontalPadding = static_cast<int16_t>(metrics.statusBarHorizontalMargin);
+  bar.gap = 10;
+  fui::statusBar(ui.frame,
+                 fui::Rect{static_cast<int16_t>(orientedMarginLeft), static_cast<int16_t>(textY),
+                           static_cast<int16_t>(renderer.getScreenWidth() - orientedMarginLeft - orientedMarginRight),
+                           static_cast<int16_t>(renderer.getLineHeight(SMALL_FONT_ID))},
+                 bar);
 
-  // Draw Title
-  if (!title.empty()) {
-    textY -= textYOffset;
-    // Centered chapter title text
-    // Page width minus existing content with 30px padding on each side
-    const int rendererableScreenWidth =
-        renderer.getScreenWidth() - (metrics.statusBarHorizontalMargin * 2) - orientedMarginLeft - orientedMarginRight;
-
-    const int batterySize = SETTINGS.statusBarBattery ? (showBatteryPercentage ? 50 : 20) : 0;
-    const int titleMarginLeft = batterySize + 30;
-    const int clockReserve = clockTextWidth > 0 ? (clockTextWidth + 10) : 0;
-    const int titleMarginRight = progressTextWidth + clockReserve + 30;
-
-    // Attempt to center title on the screen, but if title is too wide then later we will center it within the
-    // available space.
-    int titleMarginLeftAdjusted = std::max(titleMarginLeft, titleMarginRight);
-    int availableTitleSpace = rendererableScreenWidth - 2 * titleMarginLeftAdjusted;
-
-    int titleWidth;
-    titleWidth = renderer.getTextWidth(SMALL_FONT_ID, title.c_str());
-    if (titleWidth > availableTitleSpace) {
-      // Not enough space to center on the screen, center it within the remaining space instead
-      availableTitleSpace = rendererableScreenWidth - titleMarginLeft - titleMarginRight;
-      titleMarginLeftAdjusted = titleMarginLeft;
-    }
-    if (titleWidth > availableTitleSpace) {
-      title = renderer.truncatedText(SMALL_FONT_ID, title.c_str(), availableTitleSpace);
-      titleWidth = renderer.getTextWidth(SMALL_FONT_ID, title.c_str());
-    }
-
-    renderer.drawText(SMALL_FONT_ID,
-                      titleMarginLeftAdjusted + metrics.statusBarHorizontalMargin + orientedMarginLeft +
-                          (availableTitleSpace - titleWidth) / 2,
-                      textY, title.c_str());
+  // Progress bar: geometry depends on the panel margins (fillMargin extends
+  // into the bottom bezel), so it draws as its own component below the text.
+  if (SETTINGS.statusBarProgressBar != CrossPointSettings::STATUS_BAR_PROGRESS_BAR::HIDE_PROGRESS) {
+    const int barMarginLeft = fillMargin ? 0 : orientedMarginLeft;
+    const int barMarginRight = fillMargin ? 0 : orientedMarginRight;
+    const int thickness = (SETTINGS.statusBarProgressBarThickness + 1) * 2;
+    const int progressBarY = screenHeight - orientedMarginBottom - thickness - paddingBottom;
+    const int progress =
+        SETTINGS.statusBarProgressBar == CrossPointSettings::STATUS_BAR_PROGRESS_BAR::BOOK_PROGRESS
+            ? static_cast<int>(bookProgress)
+            : (pageCount > 0 ? static_cast<int>((static_cast<float>(currentPage) / pageCount) * 100) : 0);
+    fui::ProgressBarProps progressProps;
+    progressProps.value = progress;
+    progressProps.max = 100;
+    fui::progressBar(ui.frame,
+                     fui::Rect{static_cast<int16_t>(barMarginLeft), static_cast<int16_t>(progressBarY),
+                               static_cast<int16_t>(renderer.getScreenWidth() - barMarginLeft - barMarginRight),
+                               static_cast<int16_t>(thickness + (fillMargin ? orientedMarginBottom - 1 : 0))},
+                     progressProps);
   }
 }
 
@@ -866,58 +877,54 @@ void BaseTheme::drawKeyboardKey(const GfxRenderer& renderer, Rect rect, const ch
                                 const char* secondaryLabel, const KeyboardKeyType keyType,
                                 const bool inactiveSelection) const {
   const auto& metrics = UITheme::getInstance().getMetrics();
-  const int cr = metrics.keyboardKeyCornerRadius;
+  const uint8_t cr = static_cast<uint8_t>(metrics.keyboardKeyCornerRadius);
   const bool isSpecialKey = keyType == KeyboardKeyType::Shift || keyType == KeyboardKeyType::Mode ||
                             keyType == KeyboardKeyType::Del || keyType == KeyboardKeyType::Space ||
                             keyType == KeyboardKeyType::Ok || keyType == KeyboardKeyType::Disabled;
+  const bool shouldDrawOutline =
+      (metrics.keyboardDrawSpecialOutlineWhenUnselected && isSpecialKey) || metrics.keyboardOutlineAllUnselected;
 
-  if (isSelected) {
-    if (inactiveSelection) {
-      if (cr > 0) {
-        renderer.fillRoundedRect(rect.x, rect.y, rect.width, rect.height, cr, Color::LightGray);
-      } else {
-        renderer.drawRect(rect.x, rect.y, rect.width, rect.height, 2, true);
-      }
-    } else if (keyType == KeyboardKeyType::Disabled) {
-      if (cr > 0) {
-        renderer.fillRoundedRect(rect.x, rect.y, rect.width, rect.height, cr, Color::LightGray);
-      } else {
-        renderer.fillRectDither(rect.x, rect.y, rect.width, rect.height, Color::LightGray);
-      }
-    } else {
-      if (cr > 0) {
-        renderer.fillRoundedRect(rect.x, rect.y, rect.width, rect.height, cr, Color::Black);
-      } else {
-        renderer.fillRect(rect.x, rect.y, rect.width, rect.height, true);
-      }
-    }
+  // Key states map onto a FreeInkUI StyleSet: selected = black fill,
+  // inactive selection = focused (gray fill, or thick outline when square),
+  // disabled = dithered gray.
+  fui::StyleSet styles;
+  styles.normal.background =
+      metrics.keyboardFillUnselected ? fui::Paint::solid(fui::Color::White) : fui::Paint::none();
+  styles.normal.border = shouldDrawOutline ? fui::Paint::solid(fui::Color::Black) : fui::Paint::none();
+  styles.normal.borderWidth = shouldDrawOutline ? 1 : 0;
+  styles.normal.radius = cr;
+
+  styles.selected.background = fui::Paint::solid(fui::Color::Black);
+  styles.selected.foreground = fui::Paint::solid(fui::Color::White);
+  styles.selected.radius = cr;
+
+  styles.focused = styles.normal;
+  if (cr > 0) {
+    styles.focused.background = fui::Paint::dither(fui::Color::LightGray);
   } else {
-    if (metrics.keyboardFillUnselected) {
-      if (keyType == KeyboardKeyType::Disabled) {
-        if (cr > 0) {
-          renderer.fillRoundedRect(rect.x, rect.y, rect.width, rect.height, cr, Color::LightGray);
-        } else {
-          renderer.fillRectDither(rect.x, rect.y, rect.width, rect.height, Color::LightGray);
-        }
-      } else {
-        if (cr > 0) {
-          renderer.fillRoundedRect(rect.x, rect.y, rect.width, rect.height, cr, Color::White);
-        } else {
-          renderer.fillRect(rect.x, rect.y, rect.width, rect.height, false);
-        }
-      }
-    }
-
-    const bool shouldDrawOutline =
-        (metrics.keyboardDrawSpecialOutlineWhenUnselected && isSpecialKey) || metrics.keyboardOutlineAllUnselected;
-    if (shouldDrawOutline) {
-      if (cr > 0) {
-        renderer.drawRoundedRect(rect.x, rect.y, rect.width, rect.height, 1, cr, true);
-      } else {
-        renderer.drawRect(rect.x, rect.y, rect.width, rect.height);
-      }
-    }
+    styles.focused.border = fui::Paint::solid(fui::Color::Black);
+    styles.focused.borderWidth = 2;
   }
+
+  styles.disabled.background = fui::Paint::dither(fui::Color::LightGray);
+  styles.disabled.radius = cr;
+  styles.active = styles.selected;
+
+  fui::State state = fui::StateNormal;
+  if (isSelected) state = inactiveSelection ? fui::StateFocused : fui::StateSelected;
+  if (keyType == KeyboardKeyType::Disabled && !(isSelected && inactiveSelection)) state |= fui::StateDisabled;
+
+  UiFrame ui(renderer);
+  const fui::Rect keyRect{static_cast<int16_t>(rect.x), static_cast<int16_t>(rect.y),
+                          static_cast<int16_t>(rect.width), static_cast<int16_t>(rect.height)};
+  fui::ButtonProps key;
+  // Space/Del draw glyph art below instead of a label.
+  key.label = (keyType == KeyboardKeyType::Space || keyType == KeyboardKeyType::Del) ? nullptr : label;
+  key.text = uiText(fui::GfxRendererTarget::FONT_BODY, fui::TextAlign::Center);
+  key.styles = styles;
+  key.state = state;
+  key.minTouchSize = 0;  // keyboard owns its hit geometry
+  fui::button(ui.frame, keyRect, key);
 
   const bool invert = isSelected && !inactiveSelection;
 
@@ -942,18 +949,7 @@ void BaseTheme::drawKeyboardKey(const GfxRenderer& renderer, Rect rect, const ch
     return;
   }
 
-  if (label == nullptr || label[0] == '\0') {
-    return;
-  }
-
-  const bool hasSecondary = secondaryLabel != nullptr && secondaryLabel[0] != '\0';
-  const int itemWidth = renderer.getTextWidth(UI_12_FONT_ID, label);
-  const int textX = rect.x + (rect.width - itemWidth) / 2;
-  const int textY = rect.y + (rect.height - renderer.getLineHeight(UI_12_FONT_ID)) / 2;
-
-  renderer.drawText(UI_12_FONT_ID, textX, textY, label, !invert);
-
-  if (hasSecondary) {
+  if (secondaryLabel != nullptr && secondaryLabel[0] != '\0') {
     const int secWidth = renderer.getTextWidth(SMALL_FONT_ID, secondaryLabel);
     renderer.drawText(SMALL_FONT_ID, rect.x + rect.width - secWidth - metrics.keyboardSecondaryLabelRightPadding,
                       rect.y + metrics.keyboardSecondaryLabelTopPadding, secondaryLabel, !invert);
