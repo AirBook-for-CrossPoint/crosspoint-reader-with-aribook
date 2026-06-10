@@ -45,7 +45,8 @@
       "rowPaddingX": 40,
       "textInsetX": 20,
       "selectionInset": 0,
-      "selectedTextInverted": true
+      "selectedTextInverted": true,
+      "showIcons": false
     },
     "list": {
       "font": "ui12",
@@ -56,7 +57,9 @@
       "rowGap": 6,
       "rowSidePadding": 20,
       "textInsetX": 20,
-      "selectedTextInverted": true
+      "selectedTextInverted": true,
+      "centerSingleLineRows": true,
+      "centerValueVertically": true
     },
     "tabBar": {
       "font": "ui12",

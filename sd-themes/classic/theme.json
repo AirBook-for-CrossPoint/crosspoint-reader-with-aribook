@@ -41,7 +41,9 @@
       "rowBackgrounds": true,
       "selectionCornerRadius": 0,
       "selectedTextInverted": true,
-      "textInsetX": 8
+      "textInsetX": 8,
+      "centerSingleLineRows": true,
+      "centerValueVertically": true
     },
     "homeRecents": {
       "type": "card"

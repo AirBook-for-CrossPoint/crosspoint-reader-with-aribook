@@ -1488,10 +1488,15 @@ void BaseTheme::drawButtonMenu(GfxRenderer& renderer, Rect rect, int buttonCount
       Rect tileRect = Rect{panelX + spec.selectionInset, panelY + i * (m.menuRowHeight + m.menuSpacing),
                            panelWidth - spec.selectionInset * 2, m.menuRowHeight};
       if (spec.selectionStyle == ThemeMenuSelectionStyle::Pill) {
-        const int maxLabelWidth = std::max(0, panelWidth - spec.selectionInset * 2 - spec.rowPaddingX);
+        // The pill hugs its content: label width plus padding, plus the icon
+        // drawn inside the pill when icons are enabled.
+        const int iconReserve =
+            spec.showIcons && rowIcon != nullptr ? mainMenuIconSize + hPaddingInSelection + 2 : 0;
+        const int maxLabelWidth = std::max(0, panelWidth - spec.selectionInset * 2 - spec.rowPaddingX - iconReserve);
         labelStr = renderer.truncatedText(spec.fontId, label, maxLabelWidth, style);
         label = labelStr.c_str();
-        tileRect.width = std::min(tileRect.width, renderer.getTextWidth(spec.fontId, label, style) + spec.rowPaddingX);
+        tileRect.width = std::min(
+            tileRect.width, renderer.getTextWidth(spec.fontId, label, style) + spec.rowPaddingX + iconReserve);
       }
       const bool selected = selectedIndex == i;
 

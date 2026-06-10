@@ -128,11 +128,11 @@
         {
           "path": "theme.json",
           "url": "roundedraff/theme.json",
-          "size": 2198,
-          "crc32": 1391678150
+          "size": 2297,
+          "crc32": 409458708
         }
       ],
-      "totalSize": 2198
+      "totalSize": 2297
     },
     {
       "id": "classic",
@@ -142,11 +142,11 @@
         {
           "path": "theme.json",
           "url": "classic/theme.json",
-          "size": 1275,
-          "crc32": 3727450893
+          "size": 1348,
+          "crc32": 3370607679
         }
       ],
-      "totalSize": 1275
+      "totalSize": 1348
     },
     {
       "id": "lyra-3-covers",
