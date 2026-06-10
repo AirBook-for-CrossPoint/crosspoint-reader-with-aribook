@@ -2,7 +2,6 @@
 
 #include <FsHelpers.h>
 #include <HalStorage.h>
-#include <I18n.h>
 #include <Memory.h>
 
 #include "CrossPointSettings.h"
@@ -126,21 +125,21 @@ void ReaderActivity::onEnter() {
   } else if (isXtcFile(initialBookPath)) {
     auto xtc = loadXtc(initialBookPath);
     if (!xtc) {
-      activityManager.goToFullScreenMessage(tr(STR_PAGE_LOAD_ERROR), EpdFontFamily::BOLD);
+      onGoBack();
       return;
     }
     onGoToXtcReader(std::move(xtc));
   } else if (isTxtFile(initialBookPath)) {
     auto txt = loadTxt(initialBookPath);
     if (!txt) {
-      activityManager.goToFullScreenMessage(tr(STR_PAGE_LOAD_ERROR), EpdFontFamily::BOLD);
+      onGoBack();
       return;
     }
     onGoToTxtReader(std::move(txt));
   } else {
     auto epub = loadEpub(initialBookPath);
     if (!epub) {
-      activityManager.goToFullScreenMessage(tr(STR_PAGE_LOAD_ERROR), EpdFontFamily::BOLD);
+      onGoBack();
       return;
     }
     onGoToEpubReader(std::move(epub));
