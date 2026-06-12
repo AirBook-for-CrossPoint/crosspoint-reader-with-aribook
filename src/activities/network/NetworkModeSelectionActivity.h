@@ -5,10 +5,11 @@
 #include "activities/Activity.h"
 #include "util/ButtonNavigator.h"
 
-enum class NetworkMode { JOIN_NETWORK, CONNECT_CALIBRE, CREATE_HOTSPOT };
+enum class NetworkMode { SYNC_AIRBOOK, BLUETOOTH_RECEIVE, JOIN_NETWORK, CONNECT_CALIBRE, CREATE_HOTSPOT };
 
 /**
  * NetworkModeSelectionActivity presents the user with a choice:
+ * - "Bluetooth Receive" - Receive books from the CrossPoint AirBook app over BLE
  * - "Join a Network" - Connect to an existing WiFi network (STA mode)
  * - "Connect to Calibre" - Use Calibre wireless device transfers
  * - "Create Hotspot" - Create an Access Point that others can connect to (AP mode)

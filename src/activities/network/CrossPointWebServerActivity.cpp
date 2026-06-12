@@ -10,6 +10,8 @@
 #include <cstddef>
 
 #include "MappedInputManager.h"
+#include "BluetoothReceiveActivity.h"
+#include "BluetoothSyncActivity.h"
 #include "NetworkModeSelectionActivity.h"
 #include "SilentRestart.h"
 #include "WifiSelectionActivity.h"
@@ -111,7 +113,11 @@ void CrossPointWebServerActivity::onExit() {
 
 void CrossPointWebServerActivity::onNetworkModeSelected(const NetworkMode mode) {
   const char* modeName = "Join Network";
-  if (mode == NetworkMode::CONNECT_CALIBRE) {
+  if (mode == NetworkMode::SYNC_AIRBOOK) {
+    modeName = "Sync with AirBook";
+  } else if (mode == NetworkMode::BLUETOOTH_RECEIVE) {
+    modeName = "Bluetooth Receive";
+  } else if (mode == NetworkMode::CONNECT_CALIBRE) {
     modeName = "Connect to Calibre";
   } else if (mode == NetworkMode::CREATE_HOTSPOT) {
     modeName = "Create Hotspot";
@@ -121,20 +127,33 @@ void CrossPointWebServerActivity::onNetworkModeSelected(const NetworkMode mode) 
   networkMode = mode;
   isApMode = (mode == NetworkMode::CREATE_HOTSPOT);
 
-  if (mode == NetworkMode::CONNECT_CALIBRE) {
-    startActivityForResult(
-        std::make_unique<CalibreConnectActivity>(renderer, mappedInput), [this](const ActivityResult& result) {
-          state = WebServerActivityState::MODE_SELECTION;
+  auto returnToModeSelection = [this](const ActivityResult&) {
+    state = WebServerActivityState::MODE_SELECTION;
+    startActivityForResult(std::make_unique<NetworkModeSelectionActivity>(renderer, mappedInput),
+                           [this](const ActivityResult& result) {
+                             if (result.isCancelled) {
+                               onGoHome();
+                             } else {
+                               onNetworkModeSelected(std::get<NetworkModeResult>(result.data).mode);
+                             }
+                           });
+  };
 
-          startActivityForResult(std::make_unique<NetworkModeSelectionActivity>(renderer, mappedInput),
-                                 [this](const ActivityResult& result) {
-                                   if (result.isCancelled) {
-                                     onGoHome();
-                                   } else {
-                                     onNetworkModeSelected(std::get<NetworkModeResult>(result.data).mode);
-                                   }
-                                 });
-        });
+  if (mode == NetworkMode::SYNC_AIRBOOK) {
+    startActivityForResult(std::make_unique<BluetoothSyncActivity>(renderer, mappedInput),
+                           returnToModeSelection);
+    return;
+  }
+
+  if (mode == NetworkMode::BLUETOOTH_RECEIVE) {
+    startActivityForResult(std::make_unique<BluetoothReceiveActivity>(renderer, mappedInput),
+                           returnToModeSelection);
+    return;
+  }
+
+  if (mode == NetworkMode::CONNECT_CALIBRE) {
+    startActivityForResult(std::make_unique<CalibreConnectActivity>(renderer, mappedInput),
+                           returnToModeSelection);
     return;
   }
 
