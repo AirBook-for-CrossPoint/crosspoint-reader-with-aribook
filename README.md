@@ -2,7 +2,7 @@
 
 Fork of [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader) that adds support for **[AirBook for CrossPoint](https://github.com/Yoddikko/Airbook-for-CrossPoint)**, the iOS companion app. Send ebooks wirelessly from iPhone/iPad to your e-reader over Bluetooth Low Energy.
 
-[![Upstream sync](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.github.com%2Frepos%2FYoddikko%2Fcrosspoint-reader%2Fcompare%2Fcrosspoint-reader%3Amaster...Yoddikko%3Amaster&label=commits%20behind%20upstream&query=%24.behind_by&color=orange)](https://github.com/crosspoint-reader/crosspoint-reader/compare/master...Yoddikko:crosspoint-reader:master)
+[![Upstream sync](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.github.com%2Frepos%2FYoddikko%2Fcrosspoint-reader%2Fcompare%2Fcrosspoint-reader%3Amaster...master&label=commits%20behind%20upstream&query=%24.behind_by&color=orange)](https://github.com/crosspoint-reader/crosspoint-reader/compare/master...Yoddikko:crosspoint-reader:master)
 
 ## What this fork adds
 
@@ -15,7 +15,10 @@ Received books land in `/AirBook` on the SD card. The device advertises as `Cros
 
 ## Install
 
-Only the **main branch** is built and released. Grab the latest `firmware.bin` from [Releases](https://github.com/Yoddikko/crosspoint-reader/releases), then flash with the [web installer](https://crosspointreader.com/#flash-tools) (choose "Custom .bin") or via `esptool`:
+Only the **main branch** is built and released. Grab the latest `firmware.bin` from [Releases](https://github.com/Yoddikko/crosspoint-reader/releases), then flash:
+
+- **Web flasher** — [crosspoint-airbook-tools](https://github.com/Yoddikko/crosspoint-airbook-tools) provides a dedicated web installer (deploy your own or use the upstream one at [crosspointreader.com](https://crosspointreader.com/#flash-tools) with "Custom .bin")
+- **esptool** — command line:
 
 ```bash
 esptool.py --chip esp32c3 --port /dev/ttyACM0 --baud 921600 write_flash 0x10000 firmware.bin
