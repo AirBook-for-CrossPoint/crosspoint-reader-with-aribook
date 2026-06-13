@@ -15,10 +15,11 @@ Received books land in `/AirBook` on the SD card. The device advertises as `Cros
 
 ## Install
 
-Only the **main branch** is built and released. Grab the latest `firmware.bin` from [Releases](https://github.com/Yoddikko/crosspoint-reader/releases), then flash:
+Only the **main branch** is built and released. Flash directly from the browser:
 
-- **Web flasher** — [crosspoint-airbook-tools](https://github.com/Yoddikko/crosspoint-airbook-tools) provides a dedicated web installer (deploy your own or use the upstream one at [crosspointreader.com](https://crosspointreader.com/#flash-tools) with "Custom .bin")
-- **esptool** — command line:
+**[crosspoint-airbook-tools.pages.dev](https://Yoddikko.github.io/crosspoint-airbook-tools/)** — web installer with upstream sync status, SD download, and WebSerial flashing.
+
+Or use `esptool`:
 
 ```bash
 esptool.py --chip esp32c3 --port /dev/ttyACM0 --baud 921600 write_flash 0x10000 firmware.bin
