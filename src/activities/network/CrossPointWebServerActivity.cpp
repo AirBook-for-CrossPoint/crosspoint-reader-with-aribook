@@ -10,7 +10,6 @@
 #include <cstddef>
 
 #include "MappedInputManager.h"
-#include "BluetoothSyncActivity.h"
 #include "NetworkModeSelectionActivity.h"
 #include "SilentRestart.h"
 #include "WifiSelectionActivity.h"
@@ -112,9 +111,7 @@ void CrossPointWebServerActivity::onExit() {
 
 void CrossPointWebServerActivity::onNetworkModeSelected(const NetworkMode mode) {
   const char* modeName = "Join Network";
-  if (mode == NetworkMode::SYNC_AIRBOOK) {
-    modeName = "AirBook sync";
-  } else if (mode == NetworkMode::CONNECT_CALIBRE) {
+  if (mode == NetworkMode::CONNECT_CALIBRE) {
     modeName = "Connect to Calibre";
   } else if (mode == NetworkMode::CREATE_HOTSPOT) {
     modeName = "Create Hotspot";
@@ -135,12 +132,6 @@ void CrossPointWebServerActivity::onNetworkModeSelected(const NetworkMode mode) 
                              }
                            });
   };
-
-  if (mode == NetworkMode::SYNC_AIRBOOK) {
-    startActivityForResult(std::make_unique<BluetoothSyncActivity>(renderer, mappedInput),
-                           returnToModeSelection);
-    return;
-  }
 
   if (mode == NetworkMode::CONNECT_CALIBRE) {
     startActivityForResult(std::make_unique<CalibreConnectActivity>(renderer, mappedInput),

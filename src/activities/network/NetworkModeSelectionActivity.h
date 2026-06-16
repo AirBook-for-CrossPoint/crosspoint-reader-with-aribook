@@ -5,14 +5,13 @@
 #include "activities/Activity.h"
 #include "util/ButtonNavigator.h"
 
-enum class NetworkMode { SYNC_AIRBOOK, JOIN_NETWORK, CONNECT_CALIBRE, CREATE_HOTSPOT };
+enum class NetworkMode { JOIN_NETWORK, CONNECT_CALIBRE, CREATE_HOTSPOT };
 
 /**
- * NetworkModeSelectionActivity presents the user with a choice:
- * - "AirBook sync" - Receive books and firmware updates from the iOS companion app over BLE
- * - "Join a Network" - Connect to an existing WiFi network (STA mode)
- * - "Connect to Calibre" - Use Calibre wireless device transfers
- * - "Create Hotspot" - Create an Access Point that others can connect to (AP mode)
+ * NetworkModeSelectionActivity presents the user with a choice between
+ * the wifi-based transfer modes. AirBook sync used to live here but is
+ * now a first-class entry on the home menu — File Transfer is the
+ * wifi/Calibre/hotspot gate only.
  *
  * The onModeSelected callback is called with the user's choice.
  * The onCancel callback is called if the user presses back.

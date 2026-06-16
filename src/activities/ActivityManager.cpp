@@ -12,6 +12,7 @@
 #include "home/FileBrowserActivity.h"
 #include "home/HomeActivity.h"
 #include "home/RecentBooksActivity.h"
+#include "network/BluetoothSyncActivity.h"
 #include "network/CrossPointWebServerActivity.h"
 #include "reader/ReaderActivity.h"
 #include "settings/OpdsServerListActivity.h"
@@ -172,6 +173,13 @@ void ActivityManager::goToFileTransfer() {
   replaceActivity(std::make_unique<CrossPointWebServerActivity>(renderer, mappedInput));
 }
 
+void ActivityManager::goToAirBookSync() {
+  // Bypasses the WiFi/Transfer mode picker — the home-menu entry takes the
+  // user straight into AirBook sync, which is what 99% of AirBook users
+  // want every time they walk up to the device.
+  replaceActivity(std::make_unique<BluetoothSyncActivity>(renderer, mappedInput));
+}
+
 void ActivityManager::goToSettings() { replaceActivity(std::make_unique<SettingsActivity>(renderer, mappedInput)); }
 
 void ActivityManager::goToFileBrowser(std::string path) {
@@ -219,7 +227,7 @@ void ActivityManager::goHome(HomeMenuItem initialMenuItem) {
     } else if (activityName == "CrossPointWebServer") {
       initialMenuItem = HomeMenuItem::FILE_TRANSFER;
     } else if (activityName == "BluetoothSync") {
-      initialMenuItem = HomeMenuItem::FILE_TRANSFER;
+      initialMenuItem = HomeMenuItem::AIRBOOK_SYNC;
     } else if (activityName == "Settings") {
       initialMenuItem = HomeMenuItem::SETTINGS_MENU;
     }
