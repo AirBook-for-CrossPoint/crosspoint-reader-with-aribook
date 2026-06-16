@@ -8,6 +8,7 @@
 #include <cstdint>
 #include <memory>
 #include <string>
+#include <unordered_map>
 
 class NimBLECharacteristic;
 class NimBLEServer;
@@ -62,20 +63,35 @@ class BluetoothFileReceiver {
   /// Inside TARGET_DIR but leading-dot named so it doesn't show up in the
   /// AirBook iOS library listings, and is cleaned on next OTA start.
   static constexpr const char* OTA_STAGING_PATH = "/AirBook/.firmware-incoming.bin";
+  /// UUID↔filename map for the V2 sync protocol. Plain text, one
+  /// `<uuid>=<filename>` line per entry. Leading-dot so it doesn't show up
+  /// in the iOS app's library listings.
+  static constexpr const char* UUID_MAP_PATH = "/AirBook/.book-uuids";
 
   // GATT protocol used by the iOS companion app:
   //
-  // Single-receive mode:
+  // Single-receive mode (V1, used by the Discover/import-one flow):
   // - control write: "START:<filename>:<byte_count>", "END", or "CANCEL"
   // - data write:    raw file bytes, chunked by the client according to negotiated MTU
-  // - status notify: "WAITING", "CONNECTED", "READY", "PROGRESS:<done>:<total>", "DONE", "CANCELLED", or "ERROR:<message>"
+  // - status notify: "WAITING", "CONNECTED", "READY", "PROGRESS:<done>:<total>",
+  //                  "DONE", "CANCELLED", or "ERROR:<message>"
   //
-  // Sync mode (triggered by SYNC_START):
+  // Sync mode V1 (legacy, kept for back-compat):
   // - control write: "SYNC_START", "LIST", "DELETE:<filename>", "SYNC_END"
-  //                  plus the standard START/data/CANCEL within each file transfer
   // - status notify: "SYNC_READY", "FILE:<filename>:<size>", "FILES_END",
-  //                  "DELETED:<filename>", "SYNC_DONE" (on SYNC_END)
-  //                  plus standard READY/PROGRESS/DONE per file (DONE returns to Connected, not Complete)
+  //                  "DELETED:<filename>", "SYNC_DONE"
+  //
+  // Sync mode V2 (used by the iOS SyncManager — books indexed by UUID):
+  // - control write: "SYNC_START_V2", "LIST_V2",
+  //                  "START_V2:<uuid>:<size>:<filename>",
+  //                  "DELETE_ENTRY:<uuid>", "DELETE_FILE:<uuid>", "SYNC_END"
+  // - status notify: "SYNC_READY_V2",
+  //                  "FILE_V2:<uuid>:<has_file 0|1>:<size>:<filename>", "FILES_END",
+  //                  "DONE_V2:<uuid>", "DELETED_V2:<uuid>", "FILE_REMOVED:<uuid>",
+  //                  "ERROR_V2:<uuid>:<message>", "SYNC_DONE"
+  //                  plus READY/PROGRESS:<done>:<total> during each file transfer.
+  // The device persists the UUID↔filename map at /AirBook/.book-uuids so
+  // the same book keeps the same UUID across syncs.
   //
   // OTA mode (orthogonal to file modes — can be triggered standalone):
   // - control write: "OTA_START:<byte_count>:<sha256_hex>", "OTA_END", "CANCEL"
@@ -121,6 +137,20 @@ class BluetoothFileReceiver {
   size_t bytesExpected_ = 0;
 
   bool syncMode_ = false;
+  /// Sync wire protocol the current session negotiated. 1 for the
+  /// legacy SYNC_START / LIST / DELETE flow; 2 once SYNC_START_V2 lands.
+  uint8_t syncProtoVersion_ = 0;
+
+  // V2: UUID assigned by iOS for the current upload (empty for V1 START).
+  // completeUpload() picks this up to decide between DONE and DONE_V2:<uuid>.
+  std::string pendingUuid_;
+
+  // V2 persistent UUID↔filename map. Loaded lazily on the first V2 command,
+  // saved after each mutation. Both directions are kept in memory so list/
+  // resolve operations stay O(1).
+  bool uuidMapLoaded_ = false;
+  std::unordered_map<std::string, std::string> uuidToFile_;
+  std::unordered_map<std::string, std::string> fileToUuid_;
 
   // OTA state
   bool otaMode_ = false;
@@ -144,6 +174,19 @@ class BluetoothFileReceiver {
   void handleDeleteCommand(const std::string& filename);
   std::string reserveTargetPath(const std::string& rawFileName) const;
   void notifyStatusLocked(const char* status);
+
+  // V2 sync helpers
+  void ensureUuidMapLoaded();
+  void loadUuidMap();
+  void saveUuidMap() const;
+  void mapPut(const std::string& uuid, const std::string& filename);
+  void mapRemoveByUuid(const std::string& uuid);
+  void mapRemoveByFilename(const std::string& filename);
+  std::string mapFilenameForUuid(const std::string& uuid) const;
+  std::string mapUuidForFilename(const std::string& filename);  // creates if missing
+  void handleListV2Command();
+  void handleStartV2(const std::string& uuid, size_t size, const std::string& filename);
+  void handleDeleteByUuid(const std::string& uuid, const char* successPrefix);
 
   // OTA helpers
   void startOta(size_t expectedSize, const std::string& sha256Hex);

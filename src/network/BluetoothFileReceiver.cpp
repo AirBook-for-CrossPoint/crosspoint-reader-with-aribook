@@ -4,10 +4,12 @@
 #include <FsHelpers.h>
 #include <Logging.h>
 #include <NimBLEDevice.h>
+#include <esp_random.h>
 
 #include <algorithm>
 #include <cassert>
 #include <cctype>
+#include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <string>
@@ -65,6 +67,35 @@ std::string uniquePathFor(const std::string& dir, const std::string& filename) {
     if (!Storage.exists(path.c_str())) return path;
   }
   return dir + "/" + stem + "-new" + ext;
+}
+
+bool isValidUuid(const std::string& s) {
+  if (s.length() != 36) return false;
+  for (size_t i = 0; i < 36; i++) {
+    const char c = s[i];
+    if (i == 8 || i == 13 || i == 18 || i == 23) {
+      if (c != '-') return false;
+    } else if (!std::isxdigit(static_cast<unsigned char>(c))) {
+      return false;
+    }
+  }
+  return true;
+}
+
+// Generate a v4 UUID for "foreign" books on the SD that we receive without
+// an iOS-assigned UUID. Uppercase to match the Swift UUID().uuidString
+// canonical format.
+std::string generateUuidV4() {
+  uint8_t b[16];
+  for (int i = 0; i < 16; i++) b[i] = static_cast<uint8_t>(esp_random() & 0xFF);
+  b[6] = (b[6] & 0x0F) | 0x40;
+  b[8] = (b[8] & 0x3F) | 0x80;
+  char buf[37];
+  snprintf(buf, sizeof(buf),
+           "%02X%02X%02X%02X-%02X%02X-%02X%02X-%02X%02X-%02X%02X%02X%02X%02X%02X",
+           b[0], b[1], b[2], b[3], b[4], b[5], b[6], b[7],
+           b[8], b[9], b[10], b[11], b[12], b[13], b[14], b[15]);
+  return std::string(buf);
 }
 }  // namespace
 
@@ -131,6 +162,11 @@ bool BluetoothFileReceiver::begin() {
     active_ = true;
     connected_ = false;
     syncMode_ = false;
+    syncProtoVersion_ = 0;
+    pendingUuid_.clear();
+    uuidMapLoaded_ = false;
+    uuidToFile_.clear();
+    fileToUuid_.clear();
     otaMode_ = false;
     otaOpen_ = false;
     otaSha256Hex_.clear();
@@ -190,7 +226,7 @@ bool BluetoothFileReceiver::begin() {
     payload.reserve(96);
     payload += "fw=";
     payload += CROSSPOINT_VERSION;
-    payload += "\nproto=1\ncaps=book,sync,ota\n";
+    payload += "\nproto=2\ncaps=book,sync,ota\n";
     info->setValue(payload);
   }
 
@@ -287,7 +323,18 @@ void BluetoothFileReceiver::onControlWrite(const uint8_t* data, const size_t len
     ReceiverLock lock(mutex_);
     if (!active_) return;
     syncMode_ = true;
+    syncProtoVersion_ = 1;
     notifyStatusLocked("SYNC_READY");
+    return;
+  }
+
+  if (message == "SYNC_START_V2") {
+    ReceiverLock lock(mutex_);
+    if (!active_) return;
+    syncMode_ = true;
+    syncProtoVersion_ = 2;
+    ensureUuidMapLoaded();
+    notifyStatusLocked("SYNC_READY_V2");
     return;
   }
 
@@ -296,8 +343,23 @@ void BluetoothFileReceiver::onControlWrite(const uint8_t* data, const size_t len
     return;
   }
 
+  if (message == "LIST_V2") {
+    handleListV2Command();
+    return;
+  }
+
   if (message.rfind("DELETE:", 0) == 0) {
     handleDeleteCommand(message.substr(7));
+    return;
+  }
+
+  if (message.rfind("DELETE_ENTRY:", 0) == 0) {
+    handleDeleteByUuid(message.substr(13), "DELETED_V2:");
+    return;
+  }
+
+  if (message.rfind("DELETE_FILE:", 0) == 0) {
+    handleDeleteByUuid(message.substr(12), "FILE_REMOVED:");
     return;
   }
 
@@ -305,6 +367,7 @@ void BluetoothFileReceiver::onControlWrite(const uint8_t* data, const size_t len
     ReceiverLock lock(mutex_);
     if (!active_) return;
     syncMode_ = false;
+    syncProtoVersion_ = 0;
     if (uploadOpen_) closeUpload(true);
     state_ = State::Complete;
     lastCompleteName_.clear();
@@ -328,7 +391,45 @@ void BluetoothFileReceiver::onControlWrite(const uint8_t* data, const size_t len
       return;
     }
 
+    {
+      ReceiverLock lock(mutex_);
+      pendingUuid_.clear();  // V1 START → DONE without UUID
+    }
     startUpload(filename, strtoul(sizeToken.c_str(), nullptr, 10));
+    return;
+  }
+
+  if (message.rfind("START_V2:", 0) == 0) {
+    // START_V2:<uuid>:<size>:<filename>  (filename may contain colons)
+    const size_t firstColon = 8;  // start_idx of ':' after "START_V2"
+    const auto secondColon = message.find(':', firstColon + 1);
+    const auto thirdColon = secondColon == std::string::npos ?
+                             std::string::npos : message.find(':', secondColon + 1);
+    if (secondColon == std::string::npos || thirdColon == std::string::npos) {
+      ReceiverLock lock(mutex_);
+      const std::string err = "ERROR_V2::Invalid START_V2 message";
+      notifyStatusLocked(err.c_str());
+      return;
+    }
+    const std::string uuid = message.substr(firstColon + 1, secondColon - firstColon - 1);
+    const std::string sizeToken = message.substr(secondColon + 1, thirdColon - secondColon - 1);
+    const std::string filename = message.substr(thirdColon + 1);
+
+    if (!isValidUuid(uuid)) {
+      ReceiverLock lock(mutex_);
+      const std::string err = "ERROR_V2::Invalid UUID";
+      notifyStatusLocked(err.c_str());
+      return;
+    }
+    if (sizeToken.empty() || !std::all_of(sizeToken.begin(), sizeToken.end(),
+                                          [](unsigned char c) { return std::isdigit(c); })) {
+      ReceiverLock lock(mutex_);
+      const std::string err = "ERROR_V2:" + uuid + ":Invalid file size";
+      notifyStatusLocked(err.c_str());
+      return;
+    }
+
+    handleStartV2(uuid, strtoul(sizeToken.c_str(), nullptr, 10), filename);
     return;
   }
 
@@ -695,7 +796,24 @@ void BluetoothFileReceiver::completeUpload() {
   } else {
     state_ = State::Complete;
   }
-  notifyStatusLocked("DONE");
+
+  // V2 upload: rewrite the UUID↔filename map so subsequent LIST_V2 / DELETE
+  // commands resolve to the right file, then reply DONE_V2:<uuid>. V1 path
+  // keeps the bare "DONE" reply for backwards compatibility.
+  if (!pendingUuid_.empty()) {
+    // If the iOS app re-uploads with the same UUID after the device-side
+    // filename was changed (e.g. dedupe suffix), the map should point at the
+    // newly-written file, not whatever it used to point at.
+    mapRemoveByUuid(pendingUuid_);
+    mapRemoveByFilename(fileName_);
+    mapPut(pendingUuid_, fileName_);
+    saveUuidMap();
+    const std::string msg = std::string("DONE_V2:") + pendingUuid_;
+    notifyStatusLocked(msg.c_str());
+    pendingUuid_.clear();
+  } else {
+    notifyStatusLocked("DONE");
+  }
 }
 
 void BluetoothFileReceiver::failUpload(const char* error) {
@@ -707,8 +825,16 @@ void BluetoothFileReceiver::failUploadLocked(const char* error) {
   if (uploadOpen_) closeUpload(true);
   state_ = State::Error;
   error_ = error;
-  const std::string status = std::string("ERROR:") + error;
-  notifyStatusLocked(status.c_str());
+  // V2 callers want a per-uuid ERROR_V2:<uuid>:<msg> so the iOS sync can
+  // skip just this book and continue. V1 keeps the bare ERROR: form.
+  if (!pendingUuid_.empty()) {
+    const std::string status = std::string("ERROR_V2:") + pendingUuid_ + ":" + error;
+    notifyStatusLocked(status.c_str());
+    pendingUuid_.clear();
+  } else {
+    const std::string status = std::string("ERROR:") + error;
+    notifyStatusLocked(status.c_str());
+  }
   LOG_ERR("BLE", "%s", error);
 }
 
@@ -800,4 +926,223 @@ void BluetoothFileReceiver::notifyStatusLocked(const char* status) {
   if (!statusCharacteristic_) return;
   statusCharacteristic_->setValue(status);
   statusCharacteristic_->notify();
+}
+
+// MARK: - V2 sync protocol
+
+void BluetoothFileReceiver::ensureUuidMapLoaded() {
+  if (uuidMapLoaded_) return;
+  loadUuidMap();
+  uuidMapLoaded_ = true;
+}
+
+void BluetoothFileReceiver::loadUuidMap() {
+  uuidToFile_.clear();
+  fileToUuid_.clear();
+  if (!Storage.exists(UUID_MAP_PATH)) return;
+
+  HalFile f;
+  if (!Storage.openFileForRead("BLE", UUID_MAP_PATH, f) || !f) {
+    LOG_ERR("BLE", "loadUuidMap: open failed");
+    return;
+  }
+
+  // Plain text, one "<uuid>=<filename>\n" per entry. Stream a fixed-size
+  // line buffer so a corrupted file can't blow the heap.
+  constexpr size_t kBufSize = 192;
+  char line[kBufSize];
+  size_t pos = 0;
+  while (f.available()) {
+    const int b = f.read();
+    if (b < 0) break;
+    const char c = static_cast<char>(b);
+    if (c == '\n' || pos >= kBufSize - 1) {
+      line[pos] = '\0';
+      const std::string entry(line);
+      const auto eq = entry.find('=');
+      if (eq != std::string::npos && eq > 0 && eq + 1 < entry.size()) {
+        const std::string uuid = entry.substr(0, eq);
+        const std::string filename = entry.substr(eq + 1);
+        if (isValidUuid(uuid) && !filename.empty()) {
+          // Don't trust the on-disk map blindly — if the file went missing
+          // (user pulled the SD, deleted manually) we drop the entry on
+          // next save. For load, we still keep it: a later LIST_V2 will
+          // skip missing files.
+          uuidToFile_[uuid] = filename;
+          fileToUuid_[filename] = uuid;
+        }
+      }
+      pos = 0;
+    } else if (c != '\r') {
+      line[pos++] = c;
+    }
+  }
+  f.close();
+  LOG_DBG("BLE", "loaded %u UUID mappings", static_cast<unsigned>(uuidToFile_.size()));
+}
+
+void BluetoothFileReceiver::saveUuidMap() const {
+  // Make sure /AirBook exists — saveUuidMap may run before any upload.
+  if (!Storage.exists(TARGET_DIR) && !Storage.mkdir(TARGET_DIR)) {
+    LOG_ERR("BLE", "saveUuidMap: mkdir failed");
+    return;
+  }
+  // Write to a tmp path then rename so a power loss can't truncate the
+  // existing map.
+  const std::string tmpPath = std::string(UUID_MAP_PATH) + ".tmp";
+  HalFile f;
+  if (!Storage.openFileForWrite("BLE", tmpPath, f) || !f) {
+    LOG_ERR("BLE", "saveUuidMap: open failed");
+    return;
+  }
+  for (const auto& kv : uuidToFile_) {
+    f.write(reinterpret_cast<const uint8_t*>(kv.first.data()), kv.first.size());
+    f.write(reinterpret_cast<const uint8_t*>("="), 1);
+    f.write(reinterpret_cast<const uint8_t*>(kv.second.data()), kv.second.size());
+    f.write(reinterpret_cast<const uint8_t*>("\n"), 1);
+  }
+  f.flush();
+  f.close();
+  Storage.remove(UUID_MAP_PATH);
+  Storage.rename(tmpPath.c_str(), UUID_MAP_PATH);
+}
+
+void BluetoothFileReceiver::mapPut(const std::string& uuid, const std::string& filename) {
+  uuidToFile_[uuid] = filename;
+  fileToUuid_[filename] = uuid;
+}
+
+void BluetoothFileReceiver::mapRemoveByUuid(const std::string& uuid) {
+  const auto it = uuidToFile_.find(uuid);
+  if (it == uuidToFile_.end()) return;
+  fileToUuid_.erase(it->second);
+  uuidToFile_.erase(it);
+}
+
+void BluetoothFileReceiver::mapRemoveByFilename(const std::string& filename) {
+  const auto it = fileToUuid_.find(filename);
+  if (it == fileToUuid_.end()) return;
+  uuidToFile_.erase(it->second);
+  fileToUuid_.erase(it);
+}
+
+std::string BluetoothFileReceiver::mapFilenameForUuid(const std::string& uuid) const {
+  const auto it = uuidToFile_.find(uuid);
+  return it == uuidToFile_.end() ? std::string() : it->second;
+}
+
+std::string BluetoothFileReceiver::mapUuidForFilename(const std::string& filename) {
+  const auto it = fileToUuid_.find(filename);
+  if (it != fileToUuid_.end()) return it->second;
+  // Foreign book — assign a fresh UUID so iOS can refer to it.
+  const std::string uuid = generateUuidV4();
+  mapPut(uuid, filename);
+  return uuid;
+}
+
+void BluetoothFileReceiver::handleListV2Command() {
+  // Enumerate /AirBook outside the mutex so the BLE callback thread isn't
+  // blocked during SD reads.
+  std::vector<std::pair<std::string, size_t>> entries;
+  if (Storage.exists(TARGET_DIR)) {
+    auto root = Storage.open(TARGET_DIR);
+    if (root && root.isDirectory()) {
+      root.rewindDirectory();
+      char nameBuf[MAX_FILE_NAME_LEN + 1];
+      for (auto file = root.openNextFile(); file; file = root.openNextFile()) {
+        if (file.isDirectory()) continue;
+        file.getName(nameBuf, sizeof(nameBuf));
+        const std::string name(nameBuf);
+        if (!name.empty() && name[0] == '.') continue;  // skip .firmware-incoming.bin, .book-uuids
+        if (isSupportedBookFile(name)) {
+          entries.push_back({name, static_cast<size_t>(file.fileSize())});
+        }
+      }
+    }
+  }
+
+  bool mapDirty = false;
+  {
+    ReceiverLock lock(mutex_);
+    if (!active_) return;
+    ensureUuidMapLoaded();
+
+    // Drop map entries whose files vanished from the SD card. This is the
+    // path that converges the on-disk map after a manual delete.
+    std::vector<std::string> uuidsToDrop;
+    for (const auto& kv : uuidToFile_) {
+      bool found = false;
+      for (const auto& e : entries) {
+        if (e.first == kv.second) { found = true; break; }
+      }
+      if (!found) uuidsToDrop.push_back(kv.first);
+    }
+    if (!uuidsToDrop.empty()) {
+      for (const auto& u : uuidsToDrop) mapRemoveByUuid(u);
+      mapDirty = true;
+    }
+
+    char buf[64 + MAX_FILE_NAME_LEN];
+    for (const auto& entry : entries) {
+      // Look up / mint a UUID for the file. mapUuidForFilename returns the
+      // existing UUID if iOS sent the file via START_V2 earlier; otherwise
+      // it generates a v4 UUID so foreign files still show up in iOS's
+      // device LIST as "foreign" entries.
+      const bool hadUuid = fileToUuid_.count(entry.first) != 0;
+      const std::string uuid = mapUuidForFilename(entry.first);
+      if (!hadUuid) mapDirty = true;
+
+      // FILE_V2:<uuid>:<has_file>:<size>:<filename>
+      // has_file is always 1 — we don't track entry-only state on the
+      // device; if the file is enumerated, it's present.
+      snprintf(buf, sizeof(buf), "FILE_V2:%s:1:%u:%s", uuid.c_str(),
+               static_cast<unsigned>(entry.second), entry.first.c_str());
+      notifyStatusLocked(buf);
+    }
+
+    if (mapDirty) saveUuidMap();
+    notifyStatusLocked("FILES_END");
+  }
+}
+
+void BluetoothFileReceiver::handleStartV2(const std::string& uuid, const size_t size,
+                                          const std::string& filename) {
+  {
+    ReceiverLock lock(mutex_);
+    if (!active_) return;
+    ensureUuidMapLoaded();
+    pendingUuid_ = uuid;
+  }
+  // Reuse the V1 startUpload pipeline — it does the path-safety, dedup,
+  // and file-open work. The pending UUID picked up above flips
+  // completeUpload to send DONE_V2:<uuid>.
+  startUpload(filename, size);
+}
+
+void BluetoothFileReceiver::handleDeleteByUuid(const std::string& uuid,
+                                               const char* successPrefix) {
+  ReceiverLock lock(mutex_);
+  if (!active_) return;
+  ensureUuidMapLoaded();
+
+  if (!isValidUuid(uuid)) {
+    const std::string err = "ERROR_V2::Invalid UUID";
+    notifyStatusLocked(err.c_str());
+    return;
+  }
+
+  const std::string filename = mapFilenameForUuid(uuid);
+  if (!filename.empty()) {
+    const std::string path = std::string(TARGET_DIR) + "/" + filename;
+    if (Storage.exists(path.c_str())) {
+      clearBookCache(path.c_str());
+      Storage.remove(path.c_str());
+    }
+    mapRemoveByUuid(uuid);
+    saveUuidMap();
+  }
+  // Idempotent: succeed even if the book wasn't on the device — iOS expects
+  // the ack so the sync can advance to the next op.
+  const std::string msg = std::string(successPrefix) + uuid;
+  notifyStatusLocked(msg.c_str());
 }
