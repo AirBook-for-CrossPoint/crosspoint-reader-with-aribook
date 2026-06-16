@@ -14,6 +14,7 @@
 #include <utility>
 #include <vector>
 
+#include "network/FirmwareFlasher.h"
 #include "util/BookCacheUtils.h"
 
 namespace {
@@ -130,6 +131,10 @@ bool BluetoothFileReceiver::begin() {
     active_ = true;
     connected_ = false;
     syncMode_ = false;
+    otaMode_ = false;
+    otaOpen_ = false;
+    otaSha256Hex_.clear();
+    otaFlashRequested_ = false;
     fileName_.clear();
     filePath_.clear();
     lastCompleteName_.clear();
@@ -167,7 +172,8 @@ bool BluetoothFileReceiver::begin() {
   auto* control = service_->createCharacteristic(CONTROL_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
   auto* data = service_->createCharacteristic(DATA_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
   statusCharacteristic_ = service_->createCharacteristic(STATUS_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
-  if (!control || !data || !statusCharacteristic_) {
+  auto* info = service_->createCharacteristic(INFO_UUID, NIMBLE_PROPERTY::READ);
+  if (!control || !data || !statusCharacteristic_ || !info) {
     failUpload("Failed to create Bluetooth characteristics");
     return false;
   }
@@ -175,6 +181,18 @@ bool BluetoothFileReceiver::begin() {
   control->setCallbacks(controlCallbacks_.get());
   data->setCallbacks(dataCallbacks_.get());
   statusCharacteristic_->setValue("WAITING");
+
+  // Static identity payload exposed on the Info characteristic. Newline-
+  // separated key=value lines so the iOS app can parse it with a one-pass
+  // split; unknown keys are ignored for forward compatibility.
+  {
+    std::string payload;
+    payload.reserve(96);
+    payload += "fw=";
+    payload += CROSSPOINT_VERSION;
+    payload += "\nproto=1\ncaps=book,sync,ota\n";
+    info->setValue(payload);
+  }
 
   service_->start();
   NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
@@ -245,7 +263,18 @@ void BluetoothFileReceiver::onClientDisconnected() {
   if (!active_) return;
   connected_ = false;
   if (uploadOpen_) closeUpload(true);
-  if (state_ != State::Complete && state_ != State::Error) state_ = State::Waiting;
+  // Abort a partial OTA: a half-streamed firmware image is useless and we
+  // must not let it carry over into a future session. Flash never starts
+  // until OTA_END arrives, so just drop the staging file.
+  if (otaOpen_ && !otaFlashRequested_) {
+    closeOtaFile(true);
+    otaMode_ = false;
+  }
+  if (state_ != State::Complete && state_ != State::Error &&
+      state_ != State::OtaVerifying && state_ != State::OtaFlashing &&
+      state_ != State::OtaRebooting) {
+    state_ = State::Waiting;
+  }
   notifyStatusLocked("WAITING");
   LOG_DBG("BLE", "Client disconnected");
 }
@@ -304,6 +333,20 @@ void BluetoothFileReceiver::onControlWrite(const uint8_t* data, const size_t len
   }
 
   if (message == "CANCEL") {
+    {
+      ReceiverLock lock(mutex_);
+      if (otaOpen_) {
+        // Cancel an in-flight OTA: just drop the staging file. We don't
+        // touch otadata because the partition write only happens in
+        // OTA_END's flash step, which we haven't reached.
+        closeOtaFile(true);
+        otaMode_ = false;
+        otaFlashRequested_ = false;
+        state_ = connected_ ? State::Connected : State::Waiting;
+        notifyStatusLocked("CANCELLED");
+        return;
+      }
+    }
     cancelUpload("Transfer cancelled");
     return;
   }
@@ -318,12 +361,69 @@ void BluetoothFileReceiver::onControlWrite(const uint8_t* data, const size_t len
     return;
   }
 
+  if (message.rfind("OTA_START:", 0) == 0) {
+    // OTA_START:<bytes>:<sha256_hex_lowercase>
+    const auto firstColon = message.find(':');
+    const auto secondColon = message.find(':', firstColon + 1);
+    if (secondColon == std::string::npos) {
+      ReceiverLock lock(mutex_);
+      failOtaLocked("Invalid OTA_START");
+      return;
+    }
+    const std::string sizeToken = message.substr(firstColon + 1, secondColon - firstColon - 1);
+    const std::string sha256Hex = message.substr(secondColon + 1);
+    if (sizeToken.empty() || !std::all_of(sizeToken.begin(), sizeToken.end(),
+                                          [](unsigned char c) { return std::isdigit(c); })) {
+      ReceiverLock lock(mutex_);
+      failOtaLocked("Invalid OTA size");
+      return;
+    }
+    if (sha256Hex.length() != 64) {
+      // sha256 hex is exactly 64 chars; reject anything else upfront.
+      ReceiverLock lock(mutex_);
+      failOtaLocked("Invalid SHA-256");
+      return;
+    }
+    startOta(strtoul(sizeToken.c_str(), nullptr, 10), sha256Hex);
+    return;
+  }
+
+  if (message == "OTA_END") {
+    ReceiverLock lock(mutex_);
+    if (!otaOpen_) {
+      failOtaLocked("No OTA in progress");
+      return;
+    }
+    if (bytesReceived_ != bytesExpected_) {
+      failOtaLocked("Firmware transfer incomplete");
+      return;
+    }
+    closeOtaFile(false);
+    state_ = State::OtaVerifying;
+    otaFlashRequested_ = true;
+    notifyStatusLocked("OTA_VERIFYING");
+    // The activity loop picks up otaFlashRequested_ and calls
+    // performOtaFlash() on the main thread — we deliberately don't run
+    // validation/flash inside this BLE callback so the radio stack stays
+    // responsive while we still send the OTA_VERIFYING / OTA_FLASHING /
+    // OTA_REBOOTING notifications.
+    return;
+  }
+
   failUpload("Unknown control message");
 }
 
 void BluetoothFileReceiver::onDataWrite(const uint8_t* data, const size_t length) {
   ReceiverLock lock(mutex_);
-  if (!active_ || !uploadOpen_) {
+  if (!active_) {
+    notifyStatusLocked("ERROR:No active transfer");
+    return;
+  }
+  if (otaOpen_) {
+    handleOtaDataWriteLocked(data, length);
+    return;
+  }
+  if (!uploadOpen_) {
     notifyStatusLocked("ERROR:No active transfer");
     return;
   }
@@ -357,6 +457,174 @@ void BluetoothFileReceiver::onDataWrite(const uint8_t* data, const size_t length
              static_cast<unsigned>(bytesExpected_));
     notifyStatusLocked(progress);
   }
+}
+
+void BluetoothFileReceiver::handleOtaDataWriteLocked(const uint8_t* data, const size_t length) {
+  if (bytesReceived_ + length > bytesExpected_) {
+    failOtaLocked("Firmware transfer overflow");
+    return;
+  }
+  const size_t written = otaFile_.write(data, length);
+  if (written != length) {
+    failOtaLocked("SD card write failed");
+    return;
+  }
+  bytesReceived_ += written;
+
+  // Throttle the notify to ~1% steps. The iOS app drives the progress bar from
+  // these and on a 2-3 MB image, a notify per chunk floods the GATT queue and
+  // slows the actual transfer.
+  if (bytesExpected_ > 0) {
+    static constexpr size_t kNotifyEveryBytes = 32 * 1024;
+    if ((bytesReceived_ % kNotifyEveryBytes) < length || bytesReceived_ == bytesExpected_) {
+      char progress[64];
+      snprintf(progress, sizeof(progress), "OTA_PROGRESS:%u:%u",
+               static_cast<unsigned>(bytesReceived_),
+               static_cast<unsigned>(bytesExpected_));
+      notifyStatusLocked(progress);
+    }
+  }
+}
+
+void BluetoothFileReceiver::startOta(const size_t expectedSize, const std::string& sha256Hex) {
+  ReceiverLock lock(mutex_);
+  if (!active_) return;
+
+  if (uploadOpen_ || otaOpen_) {
+    failOtaLocked("Another transfer is running");
+    return;
+  }
+  if (expectedSize < 64UL * 1024UL) {
+    failOtaLocked("Firmware too small");
+    return;
+  }
+  // 5 MB hard cap as defence-in-depth; the OTA partition is ~6.25 MB but
+  // the bootloader needs some headroom and our own builds never exceed
+  // ~3 MB. The flasher does a stricter check against the actual partition.
+  if (expectedSize > 5UL * 1024UL * 1024UL) {
+    failOtaLocked("Firmware too large");
+    return;
+  }
+
+  if (!Storage.exists(TARGET_DIR) && !Storage.mkdir(TARGET_DIR)) {
+    failOtaLocked("Failed to create AirBook folder");
+    return;
+  }
+
+  // Drop a stale staging file from a previous aborted OTA, if any.
+  Storage.remove(OTA_STAGING_PATH);
+
+  if (!Storage.openFileForWrite("OTA", OTA_STAGING_PATH, otaFile_)) {
+    failOtaLocked("Failed to open staging file");
+    return;
+  }
+
+  otaOpen_ = true;
+  otaMode_ = true;
+  state_ = State::OtaReceiving;
+  bytesExpected_ = expectedSize;
+  bytesReceived_ = 0;
+  otaSha256Hex_ = sha256Hex;
+  otaFlashRequested_ = false;
+  error_.clear();
+  notifyStatusLocked("OTA_READY");
+  LOG_INF("BLE", "OTA starting: %u bytes", static_cast<unsigned>(expectedSize));
+}
+
+void BluetoothFileReceiver::cancelOta(const char* reason) {
+  ReceiverLock lock(mutex_);
+  if (otaOpen_) {
+    closeOtaFile(true);
+    otaMode_ = false;
+    otaFlashRequested_ = false;
+    state_ = connected_ ? State::Connected : State::Waiting;
+    error_ = reason;
+    notifyStatusLocked("CANCELLED");
+  }
+}
+
+void BluetoothFileReceiver::failOtaLocked(const char* message) {
+  if (otaOpen_) closeOtaFile(true);
+  otaMode_ = false;
+  otaFlashRequested_ = false;
+  state_ = State::Error;
+  error_ = message;
+  const std::string status = std::string("OTA_ERROR:") + message;
+  notifyStatusLocked(status.c_str());
+  LOG_ERR("BLE", "OTA failed: %s", message);
+}
+
+void BluetoothFileReceiver::closeOtaFile(const bool removePartial) {
+  otaFile_.close();
+  otaOpen_ = false;
+  if (removePartial) {
+    Storage.remove(OTA_STAGING_PATH);
+  }
+}
+
+bool BluetoothFileReceiver::isOtaFlashPending() const {
+  ReceiverLock lock(mutex_);
+  return otaFlashRequested_;
+}
+
+void BluetoothFileReceiver::performOtaFlash() {
+  // Claim the work atomically so the activity's poll-driven loop can't
+  // accidentally call us twice.
+  {
+    ReceiverLock lock(mutex_);
+    if (!otaFlashRequested_) return;
+    otaFlashRequested_ = false;
+  }
+
+  LOG_INF("OTA", "Validating staged firmware at %s", OTA_STAGING_PATH);
+  // Pre-validate before any partition write so we never corrupt otadata
+  // with a half-streamed image. The flasher also validates internally;
+  // doing it here lets us surface OTA_ERROR to iOS before going dark.
+  const auto vr = firmware_flash::validateImageFile(OTA_STAGING_PATH, 0);
+  if (vr != firmware_flash::Result::OK) {
+    LOG_ERR("OTA", "validation failed: %s", firmware_flash::resultName(vr));
+    ReceiverLock lock(mutex_);
+    Storage.remove(OTA_STAGING_PATH);
+    failOtaLocked("Image validation failed");
+    return;
+  }
+
+  {
+    ReceiverLock lock(mutex_);
+    state_ = State::OtaFlashing;
+    notifyStatusLocked("OTA_FLASHING");
+  }
+
+  // We deliberately don't pump OTA_PROGRESS notifications during flash —
+  // the partition write blocks the radio task in short bursts and the
+  // single OTA_FLASHING state is enough for iOS to keep an indeterminate
+  // spinner running. The whole flash runs in well under a minute.
+  const auto fr = firmware_flash::flashFromSdPath(OTA_STAGING_PATH, nullptr, nullptr,
+                                                  /*alreadyValidated=*/true);
+  if (fr != firmware_flash::Result::OK) {
+    LOG_ERR("OTA", "flash failed: %s", firmware_flash::resultName(fr));
+    ReceiverLock lock(mutex_);
+    Storage.remove(OTA_STAGING_PATH);
+    failOtaLocked("Flash write failed");
+    return;
+  }
+
+  // Clean up the staging file. Even if remove fails the bootloader will
+  // happily ignore a stray .firmware-incoming.bin — it's only a hint, the
+  // real firmware now lives in the OTA partition.
+  Storage.remove(OTA_STAGING_PATH);
+
+  {
+    ReceiverLock lock(mutex_);
+    state_ = State::OtaRebooting;
+    notifyStatusLocked("OTA_REBOOTING");
+  }
+
+  // Give the BLE notify a beat to actually reach the phone before we drop
+  // the link by rebooting. 1.5 s is what SdFirmwareUpdateActivity uses.
+  delay(1500);
+  LOG_INF("OTA", "OTA complete — restarting");
+  ESP.restart();
 }
 
 void BluetoothFileReceiver::startUpload(const std::string& rawFileName, const size_t expectedSize) {

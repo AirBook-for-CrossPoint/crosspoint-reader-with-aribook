@@ -18,6 +18,13 @@ int progressPercent(const BluetoothFileReceiver::StatusSnapshot& status) {
   if (status.bytesExpected == 0) return 0;
   return static_cast<int>((status.bytesReceived * 100UL) / status.bytesExpected);
 }
+
+bool isOtaState(BluetoothFileReceiver::State s) {
+  return s == BluetoothFileReceiver::State::OtaReceiving ||
+         s == BluetoothFileReceiver::State::OtaVerifying ||
+         s == BluetoothFileReceiver::State::OtaFlashing ||
+         s == BluetoothFileReceiver::State::OtaRebooting;
+}
 }  // namespace
 
 void BluetoothSyncActivity::onEnter() {
@@ -36,9 +43,26 @@ void BluetoothSyncActivity::onExit() {
 }
 
 void BluetoothSyncActivity::loop() {
-  if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
-    finish();
+  // Drain a pending OTA flash from the main loop. We do this before
+  // listening for the back button so the user can't accidentally cancel
+  // the activity mid-OTA. performOtaFlash() either fails (with the
+  // receiver back in Error state) or calls ESP.restart() and never returns.
+  if (receiver.isOtaFlashPending()) {
+    receiver.performOtaFlash();
+    requestUpdate();
     return;
+  }
+
+  if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
+    // Don't let the user back out while OTA is mid-flight. The radio is
+    // sending notifications, the SD has a staging .bin in progress, and
+    // teardown here would corrupt both. The OTA finishes (success or
+    // failure) before we honour the press.
+    const auto current = receiver.getStatus().state;
+    if (!isOtaState(current)) {
+      finish();
+      return;
+    }
   }
 
   const unsigned long now = millis();
@@ -81,7 +105,20 @@ void BluetoothSyncActivity::render(RenderLock&&) {
   drawBluetoothMark(pageWidth / 2, iconY + 74, animationFrame);
   renderStatus(status);
 
-  const auto labels = mappedInput.mapLabels(tr(STR_EXIT), "", "", "");
+  // Firmware version badge in the bottom corner — small enough to stay out
+  // of the way but visible during an AirBook session so the user can
+  // confirm what's running before/after an OTA.
+  {
+    const int pageHeight = renderer.getScreenHeight();
+    const int versionY = pageHeight - metrics.buttonHintsHeight - metrics.verticalSpacing * 2;
+    std::string versionLine = std::string(tr(STR_AIRBOOK_FW_PREFIX)) + CROSSPOINT_VERSION;
+    renderer.drawCenteredText(SMALL_FONT_ID, versionY, versionLine.c_str());
+  }
+
+  // While OTA is mid-flight we hide the EXIT hint so the user doesn't
+  // think they can safely back out — see the input handler in loop().
+  const bool hideExit = isOtaState(status.state);
+  const auto labels = mappedInput.mapLabels(hideExit ? "" : tr(STR_EXIT), "", "", "");
   GUI.drawButtonHints(renderer, labels.btn1, labels.btn2, labels.btn3, labels.btn4);
 
   renderer.displayBuffer();
@@ -119,7 +156,27 @@ void BluetoothSyncActivity::renderStatus(const BluetoothFileReceiver::StatusSnap
       title = tr(STR_SYNC_COMPLETE);
       detail = "";
       break;
+    case BluetoothFileReceiver::State::OtaReceiving:
+      title = tr(STR_AIRBOOK_OTA_RECEIVING);
+      detail = tr(STR_KEEP_SCREEN_OPEN);
+      break;
+    case BluetoothFileReceiver::State::OtaVerifying:
+      title = tr(STR_AIRBOOK_OTA_VERIFYING);
+      detail = "";
+      break;
+    case BluetoothFileReceiver::State::OtaFlashing:
+      title = tr(STR_AIRBOOK_OTA_FLASHING);
+      detail = tr(STR_KEEP_SCREEN_OPEN);
+      break;
+    case BluetoothFileReceiver::State::OtaRebooting:
+      title = tr(STR_AIRBOOK_OTA_REBOOTING);
+      detail = "";
+      break;
     case BluetoothFileReceiver::State::Error:
+      // OTA errors land here with status.error populated by failOtaLocked.
+      // The bare title doesn't disambiguate between book vs firmware
+      // failure, but the detail line (e.g. "Image validation failed")
+      // makes it obvious in practice.
       title = tr(STR_BLUETOOTH_ERROR);
       detail = status.error;
       break;
@@ -138,11 +195,17 @@ void BluetoothSyncActivity::renderStatus(const BluetoothFileReceiver::StatusSnap
     y += lineHeight;
   }
 
-  if (status.state == BluetoothFileReceiver::State::Receiving && status.bytesExpected > 0) {
+  // Show a progress bar for both book reception and OTA reception. The
+  // verifying/flashing/rebooting OTA states deliberately don't show one —
+  // they're not byte-progress driven and an indeterminate spinner here
+  // would just lie. The header title is the indicator instead.
+  const bool isReceiving = status.state == BluetoothFileReceiver::State::Receiving ||
+                           status.state == BluetoothFileReceiver::State::OtaReceiving;
+  if (isReceiving && status.bytesExpected > 0) {
     const int progress = progressPercent(status);
     const int barWidth = pageWidth - metrics.contentSidePadding * 3;
     const int barX = (pageWidth - barWidth) / 2;
-    const int barY = std::min(pageHeight - metrics.buttonHintsHeight - 90, y + metrics.verticalSpacing * 3);
+    const int barY = std::min(pageHeight - metrics.buttonHintsHeight - 110, y + metrics.verticalSpacing * 3);
     drawProgress(barX, barY, barWidth, progress);
 
     char progressText[32];
@@ -150,8 +213,12 @@ void BluetoothSyncActivity::renderStatus(const BluetoothFileReceiver::StatusSnap
     renderer.drawCenteredText(UI_10_FONT_ID, barY + 18, progressText);
   }
 
-  const int targetY = pageHeight - metrics.buttonHintsHeight - metrics.verticalSpacing - lineHeight;
-  renderer.drawCenteredText(SMALL_FONT_ID, targetY, tr(STR_AIRBOOK_SAVE_HINT));
+  // Footer hint: where books land. Skipped during OTA so the eye goes to
+  // the OTA state instead of an unrelated path string.
+  if (!isOtaState(status.state)) {
+    const int targetY = pageHeight - metrics.buttonHintsHeight - metrics.verticalSpacing * 4 - lineHeight;
+    renderer.drawCenteredText(SMALL_FONT_ID, targetY, tr(STR_AIRBOOK_SAVE_HINT));
+  }
 }
 
 void BluetoothSyncActivity::drawBluetoothMark(const int centerX, const int centerY,
