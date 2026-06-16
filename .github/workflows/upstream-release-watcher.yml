@@ -1,0 +1,62 @@
+name: Watch upstream releases
+
+# When the upstream CrossPoint Reader publishes a release, draft an equivalent
+# release on this fork pre-filled with their release notes and a placeholder
+# AirBook section. The drafter never publishes — review and click Publish
+# from the Releases page after filling in the AirBook additions.
+
+on:
+  schedule:
+    - cron: "0 7 * * *"   # daily at 07:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    env:
+      UPSTREAM: crosspoint-reader/crosspoint-reader
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - name: Check upstream and draft if missing
+        run: |
+          set -euo pipefail
+
+          upstream_json=$(gh release view --repo "$UPSTREAM" --json tagName,name,body)
+          upstream_tag=$(jq -r .tagName  <<<"$upstream_json")
+          upstream_name=$(jq -r .name    <<<"$upstream_json")
+
+          version="${upstream_tag#v}"
+          our_tag="v${version}-airbook.0"
+
+          existing=$(gh release list --repo "${{ github.repository }}" --limit 200 \
+            --json tagName \
+            --jq "[.[] | select(.tagName | startswith(\"v${version}-airbook\"))] | length")
+
+          if [ "$existing" -gt 0 ]; then
+            echo "Already have a release for upstream ${upstream_tag} — nothing to do."
+            exit 0
+          fi
+
+          body_file=$(mktemp)
+          {
+            echo "## AirBook additions"
+            echo
+            echo "_Fill this in before publishing — list what changed on the AirBook side since the last release (BLE protocol, iOS app integration, etc). Leave empty if nothing._"
+            echo
+            echo "---"
+            echo
+            echo "# Upstream ${upstream_name}"
+            echo
+            jq -r .body <<<"$upstream_json"
+          } > "$body_file"
+
+          gh release create "$our_tag" \
+            --repo "${{ github.repository }}" \
+            --title "CrossPoint + AirBook v${version}" \
+            --notes-file "$body_file" \
+            --draft
+
+          echo "Drafted ${our_tag} — open the Releases page to review and publish."
