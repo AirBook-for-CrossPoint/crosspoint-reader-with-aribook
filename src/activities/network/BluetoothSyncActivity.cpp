@@ -53,6 +53,14 @@ void BluetoothSyncActivity::loop() {
     return;
   }
 
+  // Drive the browse-read pump from the main loop so we never block
+  // inside the BLE callback. One chunk per tick keeps the radio
+  // responsive — iOS can send BROWSE_CANCEL on the control char and
+  // we'll honour it before the next pump call.
+  if (receiver.isBrowseReadActive()) {
+    receiver.pumpBrowseRead();
+  }
+
   if (mappedInput.wasPressed(MappedInputManager::Button::Back)) {
     // Don't let the user back out while OTA is mid-flight. The radio is
     // sending notifications, the SD has a staging .bin in progress, and

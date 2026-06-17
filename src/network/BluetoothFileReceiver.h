@@ -57,6 +57,15 @@ class BluetoothFileReceiver {
   /// (~30 s). On success it calls ESP.restart() and never returns.
   void performOtaFlash();
 
+  /// True while a BROWSE_READ is mid-stream. The activity polls this and
+  /// calls pumpBrowseRead() per loop tick to keep chunks flowing without
+  /// blocking the BLE callback thread.
+  bool isBrowseReadActive() const;
+
+  /// Push the next chunk of the active browse read over the FILE_OUT
+  /// characteristic. No-op if no read is active. Driven by the activity.
+  void pumpBrowseRead();
+
   static constexpr const char* DEVICE_NAME = "CrossPoint AirBook";
   static constexpr const char* TARGET_DIR = "/AirBook";
   /// Where the incoming firmware .bin is staged before validation+flash.
@@ -100,15 +109,27 @@ class BluetoothFileReceiver {
   //                  "OTA_VERIFYING", "OTA_FLASHING", "OTA_REBOOTING",
   //                  "OTA_ERROR:<message>"
   //
+  // Browse-read (device → iOS file extraction):
+  // - control write: "BROWSE_READ:<filename>" (scoped to /AirBook only —
+  //                  no traversal, no leading slash, no `..`)
+  //                  "BROWSE_CANCEL"
+  // - status notify: "BROWSE_READ_READY:<size>",
+  //                  "BROWSE_READ_PROGRESS:<sent>:<total>",
+  //                  "BROWSE_READ_DONE", "BROWSE_ERROR:<message>"
+  // - file_out notify: raw file bytes streamed from the device. iOS
+  //                    subscribes on the FILE_OUT characteristic and
+  //                    concatenates chunks until BROWSE_READ_DONE.
+  //
   // Info characteristic (read): plain text, newline-separated key=value lines.
   //   fw=<version>
-  //   proto=1
-  //   caps=book,sync,ota
-  static constexpr const char* SERVICE_UUID = "8b45f100-9128-4d4f-9a4f-7a0dc1b26b01";
-  static constexpr const char* CONTROL_UUID = "8b45f101-9128-4d4f-9a4f-7a0dc1b26b01";
-  static constexpr const char* DATA_UUID = "8b45f102-9128-4d4f-9a4f-7a0dc1b26b01";
-  static constexpr const char* STATUS_UUID = "8b45f103-9128-4d4f-9a4f-7a0dc1b26b01";
-  static constexpr const char* INFO_UUID = "8b45f104-9128-4d4f-9a4f-7a0dc1b26b01";
+  //   proto=2
+  //   caps=book,sync,ota,browse
+  static constexpr const char* SERVICE_UUID  = "8b45f100-9128-4d4f-9a4f-7a0dc1b26b01";
+  static constexpr const char* CONTROL_UUID  = "8b45f101-9128-4d4f-9a4f-7a0dc1b26b01";
+  static constexpr const char* DATA_UUID     = "8b45f102-9128-4d4f-9a4f-7a0dc1b26b01";
+  static constexpr const char* STATUS_UUID   = "8b45f103-9128-4d4f-9a4f-7a0dc1b26b01";
+  static constexpr const char* INFO_UUID     = "8b45f104-9128-4d4f-9a4f-7a0dc1b26b01";
+  static constexpr const char* FILE_OUT_UUID = "8b45f105-9128-4d4f-9a4f-7a0dc1b26b01";
 
  private:
   class ServerCallbacks;
@@ -123,6 +144,7 @@ class BluetoothFileReceiver {
   NimBLEServer* server_ = nullptr;
   NimBLEService* service_ = nullptr;
   NimBLECharacteristic* statusCharacteristic_ = nullptr;
+  NimBLECharacteristic* fileOutCharacteristic_ = nullptr;
 
   State state_ = State::Off;
   bool active_ = false;
@@ -159,6 +181,17 @@ class BluetoothFileReceiver {
   std::string otaSha256Hex_;
   bool otaFlashRequested_ = false;
 
+  // Browse-read state. While `browseReading_` is true the activity loop
+  // pumps chunks from `browseFile_` over the FILE_OUT notify
+  // characteristic on the main task — keeps the BLE stack responsive
+  // (no blocking inside callbacks) and lets the user CANCEL mid-stream.
+  bool browseReading_ = false;
+  HalFile browseFile_;
+  std::string browsePath_;
+  size_t browseBytesSent_ = 0;
+  size_t browseBytesTotal_ = 0;
+  size_t browseNextProgressMark_ = 0;
+
   void onClientConnected();
   void onClientDisconnected();
   void onControlWrite(const uint8_t* data, size_t length);
@@ -194,4 +227,9 @@ class BluetoothFileReceiver {
   void failOtaLocked(const char* message);
   void closeOtaFile(bool removePartial);
   void handleOtaDataWriteLocked(const uint8_t* data, size_t length);
+
+  // Browse-read helpers
+  void handleBrowseRead(const std::string& rawFilename);
+  void cancelBrowseRead(const char* reason);
+  void finishBrowseRead();
 };

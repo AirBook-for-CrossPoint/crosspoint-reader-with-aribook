@@ -171,6 +171,11 @@ bool BluetoothFileReceiver::begin() {
     otaOpen_ = false;
     otaSha256Hex_.clear();
     otaFlashRequested_ = false;
+    browseReading_ = false;
+    browsePath_.clear();
+    browseBytesSent_ = 0;
+    browseBytesTotal_ = 0;
+    browseNextProgressMark_ = 0;
     fileName_.clear();
     filePath_.clear();
     lastCompleteName_.clear();
@@ -209,7 +214,8 @@ bool BluetoothFileReceiver::begin() {
   auto* data = service_->createCharacteristic(DATA_UUID, NIMBLE_PROPERTY::WRITE | NIMBLE_PROPERTY::WRITE_NR);
   statusCharacteristic_ = service_->createCharacteristic(STATUS_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
   auto* info = service_->createCharacteristic(INFO_UUID, NIMBLE_PROPERTY::READ);
-  if (!control || !data || !statusCharacteristic_ || !info) {
+  fileOutCharacteristic_ = service_->createCharacteristic(FILE_OUT_UUID, NIMBLE_PROPERTY::NOTIFY);
+  if (!control || !data || !statusCharacteristic_ || !info || !fileOutCharacteristic_) {
     failUpload("Failed to create Bluetooth characteristics");
     return false;
   }
@@ -221,12 +227,13 @@ bool BluetoothFileReceiver::begin() {
   // Static identity payload exposed on the Info characteristic. Newline-
   // separated key=value lines so the iOS app can parse it with a one-pass
   // split; unknown keys are ignored for forward compatibility.
+  // `browse` capability lights up the device-files browser in the iOS app.
   {
     std::string payload;
     payload.reserve(96);
     payload += "fw=";
     payload += CROSSPOINT_VERSION;
-    payload += "\nproto=2\ncaps=book,sync,ota\n";
+    payload += "\nproto=2\ncaps=book,sync,ota,browse\n";
     info->setValue(payload);
   }
 
@@ -305,6 +312,12 @@ void BluetoothFileReceiver::onClientDisconnected() {
   if (otaOpen_ && !otaFlashRequested_) {
     closeOtaFile(true);
     otaMode_ = false;
+  }
+  // Drop a half-finished browse read — iOS will retry after reconnecting.
+  if (browseReading_) {
+    browseFile_.close();
+    browseReading_ = false;
+    browsePath_.clear();
   }
   if (state_ != State::Complete && state_ != State::Error &&
       state_ != State::OtaVerifying && state_ != State::OtaFlashing &&
@@ -508,6 +521,16 @@ void BluetoothFileReceiver::onControlWrite(const uint8_t* data, const size_t len
     // validation/flash inside this BLE callback so the radio stack stays
     // responsive while we still send the OTA_VERIFYING / OTA_FLASHING /
     // OTA_REBOOTING notifications.
+    return;
+  }
+
+  if (message.rfind("BROWSE_READ:", 0) == 0) {
+    handleBrowseRead(message.substr(12));
+    return;
+  }
+
+  if (message == "BROWSE_CANCEL") {
+    cancelBrowseRead("Cancelled");
     return;
   }
 
@@ -1145,4 +1168,138 @@ void BluetoothFileReceiver::handleDeleteByUuid(const std::string& uuid,
   // the ack so the sync can advance to the next op.
   const std::string msg = std::string(successPrefix) + uuid;
   notifyStatusLocked(msg.c_str());
+}
+
+// MARK: - Browse-read (device → iOS file extraction)
+
+void BluetoothFileReceiver::handleBrowseRead(const std::string& rawFilename) {
+  ReceiverLock lock(mutex_);
+  if (!active_) return;
+
+  if (browseReading_) {
+    // Don't queue — fail the new request and keep the active one
+    // running. iOS can cancel first if it wants to switch files.
+    notifyStatusLocked("BROWSE_ERROR:Read already in progress");
+    return;
+  }
+
+  // Scope: only /AirBook. Reject any '/' or '..' so we can't traverse
+  // out of the books dir. iOS knows about UUID-keyed files via LIST_V2,
+  // so a plain filename is enough — no full path needed.
+  if (rawFilename.empty() ||
+      rawFilename.find('/') != std::string::npos ||
+      rawFilename.find('\\') != std::string::npos ||
+      rawFilename == "." || rawFilename == "..") {
+    notifyStatusLocked("BROWSE_ERROR:Invalid filename");
+    return;
+  }
+  // Don't leak hidden config files (.book-uuids, .firmware-incoming.bin).
+  if (rawFilename[0] == '.') {
+    notifyStatusLocked("BROWSE_ERROR:File not browsable");
+    return;
+  }
+
+  const std::string path = std::string(TARGET_DIR) + "/" + rawFilename;
+  if (!Storage.exists(path.c_str())) {
+    notifyStatusLocked("BROWSE_ERROR:File not found");
+    return;
+  }
+
+  if (!Storage.openFileForRead("BROWSE", path, browseFile_) || !browseFile_) {
+    notifyStatusLocked("BROWSE_ERROR:Could not open file");
+    return;
+  }
+
+  browsePath_ = path;
+  browseBytesSent_ = 0;
+  browseBytesTotal_ = static_cast<size_t>(browseFile_.fileSize());
+  browseNextProgressMark_ = 0;
+  browseReading_ = true;
+
+  char buf[64];
+  snprintf(buf, sizeof(buf), "BROWSE_READ_READY:%u",
+           static_cast<unsigned>(browseBytesTotal_));
+  notifyStatusLocked(buf);
+  LOG_DBG("BLE", "Browse read start: %s (%u bytes)", path.c_str(),
+          static_cast<unsigned>(browseBytesTotal_));
+}
+
+void BluetoothFileReceiver::cancelBrowseRead(const char* reason) {
+  ReceiverLock lock(mutex_);
+  if (!browseReading_) return;
+  browseFile_.close();
+  browseReading_ = false;
+  browsePath_.clear();
+  if (reason && reason[0]) {
+    const std::string msg = std::string("BROWSE_ERROR:") + reason;
+    notifyStatusLocked(msg.c_str());
+  }
+}
+
+void BluetoothFileReceiver::finishBrowseRead() {
+  // mutex already held by caller (pumpBrowseRead under lock)
+  browseFile_.close();
+  browseReading_ = false;
+  notifyStatusLocked("BROWSE_READ_DONE");
+  LOG_DBG("BLE", "Browse read done: %s (%u bytes)", browsePath_.c_str(),
+          static_cast<unsigned>(browseBytesSent_));
+  browsePath_.clear();
+}
+
+bool BluetoothFileReceiver::isBrowseReadActive() const {
+  ReceiverLock lock(mutex_);
+  return browseReading_;
+}
+
+void BluetoothFileReceiver::pumpBrowseRead() {
+  ReceiverLock lock(mutex_);
+  if (!browseReading_ || !fileOutCharacteristic_) return;
+
+  // 224 bytes per chunk: comfortably under the negotiated 517 MTU,
+  // matches upstream tooling's known-good buffer size, and stays small
+  // enough that an unrelated notify on the STATUS characteristic
+  // (BROWSE_READ_PROGRESS) can be slotted in without backpressure.
+  constexpr size_t CHUNK = 224;
+  uint8_t buf[CHUNK];
+  const size_t remaining = browseBytesTotal_ - browseBytesSent_;
+  const size_t want = remaining < CHUNK ? remaining : CHUNK;
+  if (want == 0) {
+    finishBrowseRead();
+    return;
+  }
+
+  const int read = browseFile_.read(buf, want);
+  if (read <= 0) {
+    // Mid-file read failure — abort and let iOS retry.
+    browseFile_.close();
+    browseReading_ = false;
+    browsePath_.clear();
+    notifyStatusLocked("BROWSE_ERROR:Read error");
+    return;
+  }
+
+  // Match the rest of the file's notify pattern (setValue + notify()).
+  // NimBLE queues internally; sustained throughput on BLE 5 1M PHY is
+  // ~30 KB/s, which is below the rate the activity-loop pump can call
+  // us at (≤50 Hz × 224 B = 11 KB/s), so we don't outrun the radio.
+  fileOutCharacteristic_->setValue(buf, static_cast<size_t>(read));
+  fileOutCharacteristic_->notify();
+  browseBytesSent_ += static_cast<size_t>(read);
+
+  // Throttled status progress (one notify per 64 KB or completion). The
+  // FILE_OUT data path drives the actual transfer; this just keeps the
+  // iOS progress bar moving.
+  constexpr size_t PROGRESS_STEP = 64 * 1024;
+  if (browseBytesSent_ >= browseNextProgressMark_ || browseBytesSent_ == browseBytesTotal_) {
+    char pbuf[64];
+    snprintf(pbuf, sizeof(pbuf), "BROWSE_READ_PROGRESS:%u:%u",
+             static_cast<unsigned>(browseBytesSent_),
+             static_cast<unsigned>(browseBytesTotal_));
+    notifyStatusLocked(pbuf);
+    browseNextProgressMark_ = browseBytesSent_ + PROGRESS_STEP;
+  }
+
+  if (browseBytesSent_ >= browseBytesTotal_) {
+    finishBrowseRead();
+  }
 }
