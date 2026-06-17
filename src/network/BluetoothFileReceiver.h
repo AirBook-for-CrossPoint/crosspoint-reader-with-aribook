@@ -110,20 +110,27 @@ class BluetoothFileReceiver {
   //                  "OTA_ERROR:<message>"
   //
   // Browse-read (device → iOS file extraction):
-  // - control write: "BROWSE_READ:<filename>" (scoped to /AirBook only —
-  //                  no traversal, no leading slash, no `..`)
+  // - control write: "BROWSE_LS:<relpath>"   (relpath relative to /AirBook;
+  //                                          empty = /AirBook root)
+  //                  "BROWSE_READ:<relpath>" (relpath relative to /AirBook)
   //                  "BROWSE_CANCEL"
-  // - status notify: "BROWSE_READ_READY:<size>",
+  // - status notify: "BROWSE_ENTRY:<type>:<size>:<name>" × N then
+  //                  "BROWSE_LS_END" (type 0=file, 1=dir)
+  //                  "BROWSE_READ_READY:<size>",
   //                  "BROWSE_READ_PROGRESS:<sent>:<total>",
   //                  "BROWSE_READ_DONE", "BROWSE_ERROR:<message>"
   // - file_out notify: raw file bytes streamed from the device. iOS
   //                    subscribes on the FILE_OUT characteristic and
   //                    concatenates chunks until BROWSE_READ_DONE.
   //
-  // Info characteristic (read): plain text, newline-separated key=value lines.
+  // Info characteristic (read, callback-driven): newline-separated
+  // key=value lines, recomputed on each read so stats reflect the
+  // current /AirBook directory state.
   //   fw=<version>
   //   proto=2
   //   caps=book,sync,ota,browse
+  //   used_kb=<sum of supported book file sizes>
+  //   books=<count of supported book files>
   static constexpr const char* SERVICE_UUID  = "8b45f100-9128-4d4f-9a4f-7a0dc1b26b01";
   static constexpr const char* CONTROL_UUID  = "8b45f101-9128-4d4f-9a4f-7a0dc1b26b01";
   static constexpr const char* DATA_UUID     = "8b45f102-9128-4d4f-9a4f-7a0dc1b26b01";
@@ -135,11 +142,14 @@ class BluetoothFileReceiver {
   class ServerCallbacks;
   class ControlCallbacks;
   class DataCallbacks;
+  class InfoCallbacks;
 
   mutable SemaphoreHandle_t mutex_ = nullptr;
   std::unique_ptr<ServerCallbacks> serverCallbacks_;
   std::unique_ptr<ControlCallbacks> controlCallbacks_;
   std::unique_ptr<DataCallbacks> dataCallbacks_;
+  std::unique_ptr<InfoCallbacks> infoCallbacks_;
+  NimBLECharacteristic* infoCharacteristic_ = nullptr;
 
   NimBLEServer* server_ = nullptr;
   NimBLEService* service_ = nullptr;
@@ -229,7 +239,16 @@ class BluetoothFileReceiver {
   void handleOtaDataWriteLocked(const uint8_t* data, size_t length);
 
   // Browse-read helpers
-  void handleBrowseRead(const std::string& rawFilename);
+  void handleBrowseRead(const std::string& rawPath);
+  void handleBrowseLs(const std::string& rawPath);
   void cancelBrowseRead(const char* reason);
   void finishBrowseRead();
+  /// Resolve a user-supplied relative path against TARGET_DIR with full
+  /// safety checks (no traversal, no absolute paths, no hidden dotfiles).
+  /// Returns the full SD path on success, empty string on rejection.
+  std::string resolveBrowsePath(const std::string& rawPath) const;
+  /// Recompute the Info characteristic payload with fresh stats. Called
+  /// from InfoCallbacks::onRead so the iOS app always reads current
+  /// used_kb / books counts.
+  void refreshInfoPayload();
 };

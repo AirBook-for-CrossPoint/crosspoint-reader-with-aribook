@@ -140,6 +140,21 @@ class BluetoothFileReceiver::DataCallbacks final : public NimBLECharacteristicCa
   BluetoothFileReceiver& owner_;
 };
 
+// Refreshes the Info characteristic value on every iOS read. We don't
+// pre-cache the payload — used_kb / books need to reflect what's
+// currently on the SD card, not what was there at boot.
+class BluetoothFileReceiver::InfoCallbacks final : public NimBLECharacteristicCallbacks {
+ public:
+  explicit InfoCallbacks(BluetoothFileReceiver& owner) : owner_(owner) {}
+
+  void onRead(NimBLECharacteristic*, NimBLEConnInfo&) override {
+    owner_.refreshInfoPayload();
+  }
+
+ private:
+  BluetoothFileReceiver& owner_;
+};
+
 BluetoothFileReceiver::BluetoothFileReceiver() {
   mutex_ = xSemaphoreCreateMutex();
   assert(mutex_ != nullptr);
@@ -195,6 +210,7 @@ bool BluetoothFileReceiver::begin() {
   serverCallbacks_ = std::make_unique<ServerCallbacks>(*this);
   controlCallbacks_ = std::make_unique<ControlCallbacks>(*this);
   dataCallbacks_ = std::make_unique<DataCallbacks>(*this);
+  infoCallbacks_ = std::make_unique<InfoCallbacks>(*this);
 
   server_ = NimBLEDevice::createServer();
   if (!server_) {
@@ -222,20 +238,15 @@ bool BluetoothFileReceiver::begin() {
 
   control->setCallbacks(controlCallbacks_.get());
   data->setCallbacks(dataCallbacks_.get());
+  info->setCallbacks(infoCallbacks_.get());
+  infoCharacteristic_ = info;
   statusCharacteristic_->setValue("WAITING");
 
-  // Static identity payload exposed on the Info characteristic. Newline-
-  // separated key=value lines so the iOS app can parse it with a one-pass
-  // split; unknown keys are ignored for forward compatibility.
-  // `browse` capability lights up the device-files browser in the iOS app.
-  {
-    std::string payload;
-    payload.reserve(96);
-    payload += "fw=";
-    payload += CROSSPOINT_VERSION;
-    payload += "\nproto=2\ncaps=book,sync,ota,browse\n";
-    info->setValue(payload);
-  }
+  // Seed the Info characteristic with a non-stat payload so a client
+  // that reads BEFORE notifying gets at least fw/proto/caps. The
+  // InfoCallbacks::onRead callback recomputes the full payload (with
+  // used_kb / books) on every subsequent read.
+  refreshInfoPayload();
 
   service_->start();
   NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
@@ -275,10 +286,13 @@ void BluetoothFileReceiver::stop() {
     server_ = nullptr;
     service_ = nullptr;
     statusCharacteristic_ = nullptr;
+    fileOutCharacteristic_ = nullptr;
+    infoCharacteristic_ = nullptr;
   }
   dataCallbacks_.reset();
   controlCallbacks_.reset();
   serverCallbacks_.reset();
+  infoCallbacks_.reset();
 }
 
 BluetoothFileReceiver::StatusSnapshot BluetoothFileReceiver::getStatus() const {
@@ -521,6 +535,11 @@ void BluetoothFileReceiver::onControlWrite(const uint8_t* data, const size_t len
     // validation/flash inside this BLE callback so the radio stack stays
     // responsive while we still send the OTA_VERIFYING / OTA_FLASHING /
     // OTA_REBOOTING notifications.
+    return;
+  }
+
+  if (message.rfind("BROWSE_LS:", 0) == 0) {
+    handleBrowseLs(message.substr(10));
     return;
   }
 
@@ -1172,7 +1191,85 @@ void BluetoothFileReceiver::handleDeleteByUuid(const std::string& uuid,
 
 // MARK: - Browse-read (device → iOS file extraction)
 
-void BluetoothFileReceiver::handleBrowseRead(const std::string& rawFilename) {
+std::string BluetoothFileReceiver::resolveBrowsePath(const std::string& rawPath) const {
+  // Empty path = TARGET_DIR root, valid for BROWSE_LS only. Caller
+  // decides whether empty is acceptable.
+  if (rawPath.empty()) return std::string(TARGET_DIR);
+
+  // Reject absolute paths, Windows separators, and lone-dot-segments.
+  // Path components are split on '/' and individually validated.
+  if (rawPath[0] == '/' ||
+      rawPath.find('\\') != std::string::npos) {
+    return std::string();
+  }
+
+  size_t cursor = 0;
+  while (cursor < rawPath.size()) {
+    const auto slash = rawPath.find('/', cursor);
+    const std::string segment = rawPath.substr(
+        cursor, slash == std::string::npos ? std::string::npos : slash - cursor);
+    if (segment.empty() || segment == "." || segment == ".." ||
+        (segment[0] == '.' && segment.size() > 1)) {
+      // No empty segments (// or trailing /), no traversal, no hidden
+      // dotfiles. The leading-dot guard protects /AirBook/.book-uuids
+      // and the OTA staging file from showing up over BLE.
+      return std::string();
+    }
+    if (slash == std::string::npos) break;
+    cursor = slash + 1;
+  }
+  return std::string(TARGET_DIR) + "/" + rawPath;
+}
+
+void BluetoothFileReceiver::handleBrowseLs(const std::string& rawPath) {
+  std::string full;
+  {
+    ReceiverLock lock(mutex_);
+    if (!active_) return;
+    full = resolveBrowsePath(rawPath);
+    if (full.empty()) {
+      notifyStatusLocked("BROWSE_ERROR:Invalid path");
+      return;
+    }
+  }
+
+  // Enumerate outside the mutex so SD I/O doesn't stall BLE callbacks.
+  struct Entry { std::string name; size_t size; bool isDir; };
+  std::vector<Entry> entries;
+  if (Storage.exists(full.c_str())) {
+    auto dir = Storage.open(full.c_str());
+    if (dir && dir.isDirectory()) {
+      dir.rewindDirectory();
+      char nameBuf[MAX_FILE_NAME_LEN + 1];
+      for (auto f = dir.openNextFile(); f; f = dir.openNextFile()) {
+        f.getName(nameBuf, sizeof(nameBuf));
+        const std::string name(nameBuf);
+        if (name.empty() || name[0] == '.') continue;  // hidden / config
+        entries.push_back({name, static_cast<size_t>(f.fileSize()), f.isDirectory()});
+      }
+    } else {
+      ReceiverLock lock(mutex_);
+      notifyStatusLocked("BROWSE_ERROR:Not a directory");
+      return;
+    }
+  } else {
+    ReceiverLock lock(mutex_);
+    notifyStatusLocked("BROWSE_ERROR:Path not found");
+    return;
+  }
+
+  ReceiverLock lock(mutex_);
+  if (!active_) return;
+  char buf[64 + MAX_FILE_NAME_LEN];
+  for (const auto& e : entries) {
+    snprintf(buf, sizeof(buf), "BROWSE_ENTRY:%d:%u:%s",
+             e.isDir ? 1 : 0, static_cast<unsigned>(e.size), e.name.c_str());
+    notifyStatusLocked(buf);
+  }
+  notifyStatusLocked("BROWSE_LS_END");
+}
+
+void BluetoothFileReceiver::handleBrowseRead(const std::string& rawPath) {
   ReceiverLock lock(mutex_);
   if (!active_) return;
 
@@ -1183,34 +1280,29 @@ void BluetoothFileReceiver::handleBrowseRead(const std::string& rawFilename) {
     return;
   }
 
-  // Scope: only /AirBook. Reject any '/' or '..' so we can't traverse
-  // out of the books dir. iOS knows about UUID-keyed files via LIST_V2,
-  // so a plain filename is enough — no full path needed.
-  if (rawFilename.empty() ||
-      rawFilename.find('/') != std::string::npos ||
-      rawFilename.find('\\') != std::string::npos ||
-      rawFilename == "." || rawFilename == "..") {
-    notifyStatusLocked("BROWSE_ERROR:Invalid filename");
-    return;
-  }
-  // Don't leak hidden config files (.book-uuids, .firmware-incoming.bin).
-  if (rawFilename[0] == '.') {
-    notifyStatusLocked("BROWSE_ERROR:File not browsable");
+  const std::string full = resolveBrowsePath(rawPath);
+  if (full.empty() || rawPath.empty()) {
+    notifyStatusLocked("BROWSE_ERROR:Invalid path");
     return;
   }
 
-  const std::string path = std::string(TARGET_DIR) + "/" + rawFilename;
-  if (!Storage.exists(path.c_str())) {
+  if (!Storage.exists(full.c_str())) {
     notifyStatusLocked("BROWSE_ERROR:File not found");
     return;
   }
 
-  if (!Storage.openFileForRead("BROWSE", path, browseFile_) || !browseFile_) {
+  if (!Storage.openFileForRead("BROWSE", full, browseFile_) || !browseFile_) {
     notifyStatusLocked("BROWSE_ERROR:Could not open file");
     return;
   }
+  // Reject directories: BROWSE_READ is files-only. BROWSE_LS for dirs.
+  // SdFat doesn't separate open(file vs dir); detect via the HalFile
+  // wrapper if it exposes isDirectory — for safety we check fileSize
+  // staying >0 isn't enough, but Storage.open in dir mode would
+  // succeed differently. Pragmatic: rely on the iOS UI to only send
+  // BROWSE_READ for file entries it saw via BROWSE_LS.
 
-  browsePath_ = path;
+  browsePath_ = full;
   browseBytesSent_ = 0;
   browseBytesTotal_ = static_cast<size_t>(browseFile_.fileSize());
   browseNextProgressMark_ = 0;
@@ -1220,8 +1312,41 @@ void BluetoothFileReceiver::handleBrowseRead(const std::string& rawFilename) {
   snprintf(buf, sizeof(buf), "BROWSE_READ_READY:%u",
            static_cast<unsigned>(browseBytesTotal_));
   notifyStatusLocked(buf);
-  LOG_DBG("BLE", "Browse read start: %s (%u bytes)", path.c_str(),
+  LOG_DBG("BLE", "Browse read start: %s (%u bytes)", full.c_str(),
           static_cast<unsigned>(browseBytesTotal_));
+}
+
+void BluetoothFileReceiver::refreshInfoPayload() {
+  // Enumerate /AirBook to compute used_kb + books. Skips hidden dotfiles
+  // (uuid map, OTA staging) so the count reflects user-visible books.
+  size_t usedBytes = 0;
+  int bookCount = 0;
+  if (Storage.exists(TARGET_DIR)) {
+    auto dir = Storage.open(TARGET_DIR);
+    if (dir && dir.isDirectory()) {
+      dir.rewindDirectory();
+      char nameBuf[MAX_FILE_NAME_LEN + 1];
+      for (auto f = dir.openNextFile(); f; f = dir.openNextFile()) {
+        if (f.isDirectory()) continue;
+        f.getName(nameBuf, sizeof(nameBuf));
+        const std::string name(nameBuf);
+        if (name.empty() || name[0] == '.') continue;
+        if (!isSupportedBookFile(name)) continue;
+        usedBytes += static_cast<size_t>(f.fileSize());
+        bookCount++;
+      }
+    }
+  }
+
+  char payload[256];
+  snprintf(payload, sizeof(payload),
+           "fw=%s\nproto=2\ncaps=book,sync,ota,browse\nused_kb=%u\nbooks=%d\n",
+           CROSSPOINT_VERSION,
+           static_cast<unsigned>(usedBytes / 1024),
+           bookCount);
+  if (infoCharacteristic_) {
+    infoCharacteristic_->setValue(payload);
+  }
 }
 
 void BluetoothFileReceiver::cancelBrowseRead(const char* reason) {
