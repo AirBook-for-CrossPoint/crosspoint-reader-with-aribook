@@ -1149,15 +1149,49 @@ void BluetoothFileReceiver::handleListV2Command() {
 
 void BluetoothFileReceiver::handleStartV2(const std::string& uuid, const size_t size,
                                           const std::string& filename) {
+  // Dedup before the upload opens. Without this, iOS's UUID-only planner
+  // happily re-uploads a book the device already has — uniquePathFor would
+  // assign `book (1).epub` and we'd ship a duplicate on disk.
+  //   (a) UUID already mapped → erase the old file so the same path is
+  //       reused on overwrite.
+  //   (b) UUID is new but the sanitized filename matches a file already on
+  //       the SD (foreign import indexed under a different UUID) → re-tag
+  //       and reply DONE_V2 immediately, no bytes transferred.
+  std::string adoptDoneMsg;
   {
     ReceiverLock lock(mutex_);
     if (!active_) return;
     ensureUuidMapLoaded();
+
+    const std::string existingForUuid = mapFilenameForUuid(uuid);
+    if (!existingForUuid.empty()) {
+      const std::string oldPath = std::string(TARGET_DIR) + "/" + existingForUuid;
+      Storage.remove(oldPath.c_str());
+    } else {
+      char sanitized[MAX_FILE_NAME_LEN];
+      FsHelpers::sanitizePathComponentForFat32(
+          trimFilename(filename).c_str(), sanitized, sizeof(sanitized));
+      const std::string sanitizedStr(sanitized);
+      const auto it = fileToUuid_.find(sanitizedStr);
+      if (it != fileToUuid_.end()) {
+        mapRemoveByFilename(sanitizedStr);
+        mapPut(uuid, sanitizedStr);
+        saveUuidMap();
+        adoptDoneMsg = std::string("DONE_V2:") + uuid;
+      }
+    }
+
+    if (!adoptDoneMsg.empty()) {
+      syncMode_ = true;
+      notifyStatusLocked(adoptDoneMsg.c_str());
+      return;
+    }
+
     pendingUuid_ = uuid;
   }
-  // Reuse the V1 startUpload pipeline — it does the path-safety, dedup,
-  // and file-open work. The pending UUID picked up above flips
-  // completeUpload to send DONE_V2:<uuid>.
+  // Reuse the V1 startUpload pipeline — it does the path-safety and
+  // file-open work. The pending UUID picked up above flips completeUpload
+  // to send DONE_V2:<uuid>.
   startUpload(filename, size);
 }
 
