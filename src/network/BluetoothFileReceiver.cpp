@@ -19,9 +19,6 @@
 #include "network/FirmwareFlasher.h"
 #include "util/BookCacheUtils.h"
 
-// SdFreeSpace.cpp — kept prototype-only here so this TU never sees SdFat.
-uint64_t crosspointSdFreeKB();
-
 namespace {
 constexpr size_t MAX_FILE_NAME_LEN = 96;
 constexpr size_t MAX_UPLOAD_SIZE = 200UL * 1024UL * 1024UL;
@@ -1375,9 +1372,11 @@ void BluetoothFileReceiver::refreshInfoPayload() {
     }
   }
 
-  // SD free space for the iOS upload-plan pre-check. See SdFreeSpace.cpp
-  // for why this lives in its own translation unit.
-  const uint64_t freeKB = crosspointSdFreeKB();
+  // SD free space for the iOS upload-plan pre-check. sdUsedBytes is cached
+  // SDK-side (~20s TTL) so Info reads stay cheap.
+  const uint64_t totalBytes = Storage.sdTotalBytes();
+  const uint64_t usedBytesCard = Storage.sdUsedBytes();
+  const uint64_t freeKB = (totalBytes > usedBytesCard) ? (totalBytes - usedBytesCard) / 1024 : 0;
 
   char payload[256];
   snprintf(payload, sizeof(payload),

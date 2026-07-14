@@ -15,6 +15,10 @@ class HalStorage {
   HalStorage();
   bool begin();
   bool ready() const;
+  // Card capacity / used bytes (used is cached SDK-side with a ~20s TTL —
+  // freeClusterCount scans the FAT). Both return 0 when not mounted.
+  uint64_t sdTotalBytes();
+  uint64_t sdUsedBytes();
   std::vector<String> listFiles(const char* path = "/", int maxFiles = 200);
   // Read the entire file at `path` into a String. Returns empty string on failure.
   String readFile(const char* path);
