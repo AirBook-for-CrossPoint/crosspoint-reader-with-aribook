@@ -2,7 +2,7 @@
 
 Fork of [CrossPoint Reader](https://github.com/crosspoint-reader/crosspoint-reader) that adds BLE support for the [AirBook for CrossPoint](https://github.com/AirBook-for-CrossPoint/Airbook-iOS-for-CrossPoint) iOS companion app.
 
-[![Upstream sync](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.github.com%2Frepos%2FAirBook-for-CrossPoint%2Fcrosspoint-reader-with-aribook%2Fcompare%2Fcrosspoint-reader%3Amaster...master&label=commits%20behind%20upstream&query=%24.behind_by&color=orange)](https://github.com/crosspoint-reader/crosspoint-reader/compare/master...AirBook-for-CrossPoint:crosspoint-reader-with-aribook:master)
+[![Upstream sync](https://img.shields.io/badge/dynamic/json?url=https%3A%2F%2Fapi.github.com%2Frepos%2FAirBook-for-CrossPoint%2Fcrosspoint-reader-with-aribook%2Fcompare%2Fcrosspoint-reader%3Adevelop...master&label=commits%20behind%20upstream&query=%24.behind_by&color=orange)](https://github.com/crosspoint-reader/crosspoint-reader/compare/develop...AirBook-for-CrossPoint:crosspoint-reader-with-aribook:master)
 
 ## What this fork adds
 

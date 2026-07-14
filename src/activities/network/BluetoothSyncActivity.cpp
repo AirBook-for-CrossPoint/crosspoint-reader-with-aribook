@@ -42,6 +42,18 @@ void BluetoothSyncActivity::onExit() {
   Activity::onExit();
 }
 
+bool BluetoothSyncActivity::preventAutoSleep() {
+  // Keep the device awake only while a session is actually in flight.
+  // An unconditional true here meant the idle Waiting/Complete screens
+  // never auto-slept: leave the sync screen after a sync and the device
+  // sat fully awake on it forever. Uses the cached snapshot (refreshed
+  // every 500ms in loop) — this is polled every main-loop tick and
+  // getStatus() takes the receiver mutex + copies strings.
+  return lastSnapshot.connected ||
+         lastSnapshot.state == BluetoothFileReceiver::State::Receiving ||
+         isOtaState(lastSnapshot.state);
+}
+
 void BluetoothSyncActivity::loop() {
   // Drain a pending OTA flash from the main loop. We do this before
   // listening for the back button so the user can't accidentally cancel
