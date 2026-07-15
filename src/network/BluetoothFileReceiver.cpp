@@ -242,11 +242,21 @@ bool BluetoothFileReceiver::begin() {
   infoCharacteristic_ = info;
   statusCharacteristic_->setValue("WAITING");
 
-  // Seed the Info characteristic with a non-stat payload so a client
-  // that reads BEFORE notifying gets at least fw/proto/caps. The
-  // InfoCallbacks::onRead callback recomputes the full payload (with
-  // used_kb / books) on every subsequent read.
-  refreshInfoPayload();
+  // Seed the Info characteristic with fw/proto/caps only — no SD scan.
+  // freeink-sdk's sdUsedBytes() does a full freeClusterCount on cold
+  // cache (multi-second on large FAT32 cards) and this used to call
+  // refreshInfoPayload() here, blocking the main task long enough to
+  // starve USB CDC and delay BLE advertising past iOS's scan window.
+  // The stats-heavy payload gets computed on demand in
+  // InfoCallbacks::onRead (NimBLE task), by which time the SDK cache
+  // is usually warm.
+  {
+    char seed[128];
+    std::snprintf(seed, sizeof(seed),
+                  "fw=%s\nproto=2\ncaps=book,sync,ota,browse\n",
+                  CROSSPOINT_VERSION);
+    infoCharacteristic_->setValue(seed);
+  }
 
   service_->start();
   NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
