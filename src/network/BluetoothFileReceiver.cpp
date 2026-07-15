@@ -278,6 +278,14 @@ void BluetoothFileReceiver::stop() {
   if (wasActive || NimBLEDevice::isInitialized()) {
     LOG_DBG("BLE", "Stopping Bluetooth receiver");
     NimBLEDevice::stopAdvertising();
+    // Detach the Info onRead callback before deinit. Info is the only
+    // read-notify characteristic we expose, so it's the only one iOS
+    // can poll asynchronously during teardown. Leaving the pointer live
+    // let a pending onRead fire mid-deinit and dirty the heap, which
+    // then tripped tlsf "block already marked as free" inside the
+    // subsequent infoCallbacks_.reset(). Control/Data are write-only —
+    // iOS can't trigger them without an active session.
+    if (infoCharacteristic_) infoCharacteristic_->setCallbacks(nullptr);
     NimBLEDevice::deinit(true);
   }
 
