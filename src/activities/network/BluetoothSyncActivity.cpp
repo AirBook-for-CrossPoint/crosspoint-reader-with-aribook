@@ -43,15 +43,15 @@ void BluetoothSyncActivity::onExit() {
 }
 
 bool BluetoothSyncActivity::preventAutoSleep() {
-  // Keep the device awake only while a session is actually in flight.
-  // An unconditional true here meant the idle Waiting/Complete screens
-  // never auto-slept: leave the sync screen after a sync and the device
-  // sat fully awake on it forever. Uses the cached snapshot (refreshed
-  // every 500ms in loop) — this is polled every main-loop tick and
-  // getStatus() takes the receiver mutex + copies strings.
-  return lastSnapshot.connected ||
-         lastSnapshot.state == BluetoothFileReceiver::State::Receiving ||
-         isOtaState(lastSnapshot.state);
+  // Always block auto-sleep on the AirBook Sync screen. The gated
+  // version (sleep when idle) triggered a heap-corruption crash inside
+  // BluetoothFileReceiver::stop() during the sleep→onExit teardown —
+  // NimBLE 2.5 + freeink-sdk interaction that hasn't been root-caused
+  // yet. Battery cost is acceptable: user backs out of the screen to
+  // re-enable normal sleep. Revisit when the teardown path is
+  // restructured.
+  // ponytail: always awake here; per-state gating once stop() is safe.
+  return true;
 }
 
 void BluetoothSyncActivity::loop() {

@@ -260,8 +260,19 @@ bool BluetoothFileReceiver::begin() {
 
   service_->start();
   NimBLEAdvertising* advertising = NimBLEDevice::getAdvertising();
-  advertising->setName(DEVICE_NAME);
-  advertising->addServiceUUID(SERVICE_UUID);
+  // Advertisement packet is 31 bytes max. "CrossPoint AirBook" (20B name)
+  // plus a 128-bit service UUID (18B) plus flags (3B) is 41B — NimBLE
+  // silently drops the UUID, which breaks iOS's foreground+background
+  // scan filter `scanForPeripherals(withServices:[kServiceUUID])`. Put
+  // the UUID in the primary ad (needed for the scan filter) and the
+  // full name in the scan response.
+  NimBLEAdvertisementData adv;
+  adv.setFlags(BLE_HS_ADV_F_DISC_GEN | BLE_HS_ADV_F_BREDR_UNSUP);
+  adv.setCompleteServices(NimBLEUUID(SERVICE_UUID));
+  NimBLEAdvertisementData scanResp;
+  scanResp.setName(DEVICE_NAME);
+  advertising->setAdvertisementData(adv);
+  advertising->setScanResponseData(scanResp);
   advertising->start();
 
   {
@@ -1186,14 +1197,24 @@ void BluetoothFileReceiver::handleStartV2(const std::string& uuid, const size_t 
       const std::string oldPath = std::string(TARGET_DIR) + "/" + existingForUuid;
       Storage.remove(oldPath.c_str());
     } else {
-      char sanitized[MAX_FILE_NAME_LEN];
-      FsHelpers::sanitizePathComponentForFat32(
-          trimFilename(filename).c_str(), sanitized, sizeof(sanitized));
-      const std::string sanitizedStr(sanitized);
-      const auto it = fileToUuid_.find(sanitizedStr);
-      if (it != fileToUuid_.end()) {
-        mapRemoveByFilename(sanitizedStr);
-        mapPut(uuid, sanitizedStr);
+      // Try raw filename first — books loaded on the SD before the
+      // sanitize-writes-dashes convention (or copied there manually)
+      // keep their spaces on disk, so the map key is raw. Then fall
+      // back to the sanitized form for anything written by us.
+      const std::string rawTrimmed = trimFilename(filename);
+      std::string matchedKey;
+      if (fileToUuid_.count(rawTrimmed)) {
+        matchedKey = rawTrimmed;
+      } else {
+        char sanitized[MAX_FILE_NAME_LEN];
+        FsHelpers::sanitizePathComponentForFat32(
+            rawTrimmed.c_str(), sanitized, sizeof(sanitized));
+        const std::string sanitizedStr(sanitized);
+        if (fileToUuid_.count(sanitizedStr)) matchedKey = sanitizedStr;
+      }
+      if (!matchedKey.empty()) {
+        mapRemoveByFilename(matchedKey);
+        mapPut(uuid, matchedKey);
         saveUuidMap();
         adoptDoneMsg = std::string("DONE_V2:") + uuid;
       }
